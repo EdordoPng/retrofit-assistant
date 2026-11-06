@@ -222,3 +222,30 @@ Consequences:
   cut order applies otherwise.
 - One alert per condition can cost a second detection on compound events that share a channel
   family. This is measured on train in P1.
+
+## Amendment 2026-11-07
+
+Accepted by the owner. Where this section differs from the text above, this section prevails.
+
+"No reminders through per-family conditions" (Amendment 2026-11-06, row 9) was measured and rejected
+for P0. The gate: keep a variant only if it loses no detection and does not raise false plus
+excess-repeat episodes against `causal_b1`, on train and on validation.
+
+All runs use the official scorer on causal z-scores. Reference `causal_b1`: 58.45 and 78.01.
+
+| Variant | Train score | Validation score | Detected (of 26, 9) | False + excess (train, validation) | Gate |
+| --- | --- | --- | --- | --- | --- |
+| (a) `causal_b1` candidates, guarantees only | 58.45 | 78.01 | 18, 8 | 7, 1 | Pass |
+| (b) (a) plus same `fault_type` suppressed on a pump for 12 h | 58.45 | 78.01 | 18, 8 | 7, 1 | Pass, identical to (a) |
+| (c) `causal_b1` candidates, per-family conditions, `CONDITION_CLEAR_MIN` = 15 | 56.74 | 72.39 | 17, 7 | 5, 1 | Fail, loses detections |
+| Spec policy, persistence per family, same clear time | 49.23 | 65.47 | 17, 7 | 19, 5 | Fail, prototype before this gate |
+
+Decision: keep (a). It equals `causal_b1` row for row on both splits, because no candidate falls in
+a stopped minute or within 6 min of another on those splits. (b) adds nothing, since `b1_threshold`
+already applies a 12 h refractory per fault type. The guarantees still protect the test split.
+
+Consequences:
+- Per-family conditions are reconsidered in P1, once diagnosis exists.
+- Reminders from `causal_b1` stay in the output until then.
+- The safety CSV is `apply_guarantees(causal_b1)` until an improved pipeline passes the C9 gate: score
+  >= `causal_b1` on both splits and > on at least one. The gate does not apply in P0.

@@ -243,3 +243,9 @@ Margin: 65 minutes.
 
 ## Changes after approval
 - 2026-11-06: P0-6 now sets the threshold for false-alert episodes in the first 24 h, as the owner decided.
+- 2026-11-07, safety submission: decided by the owner. The safety CSV is `apply_guarantees(causal_b1)`. This replaces "the submission always comes from `full`" in Design and the `full` part of P0-5 and P0-6 for the safety CSV.
+- 2026-11-07, C9: decided by the owner. The gate decides when an improved pipeline replaces the source of the safety CSV. It passes if the composite is >= `causal_b1` on both train and validation and > on at least one of them. This replaces "beats causal B1 on both train and validation" in C9. The gate does not apply in P0, where `full` is by construction `causal_b1` plus the guarantees. It still never blocks generating a submission.
+- 2026-11-07, P0-4 redefined: decided by the owner after measuring on train and validation, see ADR 0001 Amendment 2026-11-07. P0-4 is a filter on `causal_b1` candidates: pass-through plus mandatory guarantees. `full` in P0 is `causal_b1` through this filter. Evidence-family conditions are not built in P0 and are reconsidered in P1, once diagnosis exists. This entry prevails over the policy paragraph in Design, the Out of scope line on reminders, and C7:
+  - C7 now reads: given crafted candidate streams, when the filter is applied, then each alert has one type and one class, alerts on one pump are at least `ALERT_SPACING_MIN` = 6 min apart, no alert falls in a minute whose `operating_mode` is `STOPPED` or `LOCKED_OUT`, and an emitted alert is never revised. Official-scorer fixtures cover mixed types, mixed classes, the 5-min boundary, and UNKNOWN followed by a correct diagnosis. Verify is unchanged.
+  - A minute with no row has an unknown state and does not count as stopped.
+  - The 12 h repeat limit is the one already inside `b1_threshold`. Reminders from `causal_b1` stay in the output until diagnosis exists.
