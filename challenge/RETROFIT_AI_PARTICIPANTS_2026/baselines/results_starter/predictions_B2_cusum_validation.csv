@@ -1,0 +1,15 @@
+asset_id,alert_time_utc,event_class,fault_type,confidence,evidence,recommended_action
+PUMP-08,2025-09-10T01:11:00Z,MACHINE,UNKNOWN,0.99,B2 CUSUM: ,Inspect pump.
+PUMP-08,2025-09-10T07:05:00Z,MACHINE,SUCTION_STRAINER_CLOGGING,0.99,B2 CUSUM: suction_pressure_kpa z=-4.1,Inspect / clean suction strainer.
+PUMP-08,2025-09-10T19:09:00Z,MACHINE,SUCTION_STRAINER_CLOGGING,0.99,B2 CUSUM: suction_pressure_kpa z=-8.9,Inspect / clean suction strainer.
+PUMP-08,2025-09-11T07:14:00Z,MACHINE,SUCTION_STRAINER_CLOGGING,0.99,"B2 CUSUM: suction_pressure_kpa z=-12.2, discharge_pressure_kpa z=-4.7, vibration_crest_factor z=+4.7",Inspect / clean suction strainer.
+PUMP-08,2025-09-11T16:15:00Z,MACHINE,UNKNOWN,0.99,B2 CUSUM: ,Inspect pump.
+PUMP-08,2025-09-12T23:53:00Z,SENSOR,COMMUNICATION_LOSS,0.05,B2 CUSUM: missing rows,Check gateway / network; data gap.
+PUMP-08,2025-09-13T06:32:00Z,MACHINE,UNKNOWN,0.99,B2 CUSUM: ,Inspect pump.
+PUMP-08,2025-09-13T07:54:00Z,MACHINE,BEARING_WEAR,0.99,"B2 CUSUM: vibration_crest_factor z=+10.9, vibration_accel_rms_g z=+4.8",Inspect pump bearing; plan replacement; check lubrication.
+PUMP-08,2025-09-13T12:05:00Z,SENSOR,SENSOR_CALIBRATION_SHIFT,0.99,B2 CUSUM: fluid_temp_c deviates alone (z=-4.6),Verify fluid_temp_c against a reference gauge.
+PUMP-08,2025-09-13T18:52:00Z,MACHINE,UNKNOWN,0.99,B2 CUSUM: fluid_temp_c z=-7.4,Inspect pump.
+PUMP-08,2025-09-13T22:04:00Z,MACHINE,BEARING_WEAR,0.99,"B2 CUSUM: vibration_crest_factor z=+14.0, vibration_accel_rms_g z=+9.7, fluid_temp_c z=-7.2",Inspect pump bearing; plan replacement; check lubrication.
+PUMP-08,2025-09-14T07:07:00Z,MACHINE,UNKNOWN,0.99,B2 CUSUM: fluid_temp_c z=-4.2,Inspect pump.
+PUMP-08,2025-09-14T20:02:00Z,MACHINE,UNKNOWN,0.99,B2 CUSUM: fluid_temp_c z=-4.6,Inspect pump.
+PUMP-08,2025-09-14T22:59:00Z,MACHINE,BEARING_WEAR,0.99,"B2 CUSUM: vibration_accel_rms_g z=+16.4, vibration_crest_factor z=+11.6",Inspect pump bearing; plan replacement; check lubrication.

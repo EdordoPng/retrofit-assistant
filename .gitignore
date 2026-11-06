@@ -1,0 +1,20 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+
+# Local run artefacts
+build/
+my_results/
+
+# Secrets and local config
+.env
+.env.*
+
+# Supervisor state (also excluded globally)
+.supervisor/
+
+# OS / editor
+.DS_Store

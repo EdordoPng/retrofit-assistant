@@ -1,0 +1,3 @@
+asset_id,alert_time_utc,event_class,fault_type,confidence,evidence,recommended_action
+PUMP-08,2025-09-13T00:02:00Z,SENSOR,COMMUNICATION_LOSS,0.7008395051847435,B3 IsolationForest: missing rows,Check gateway / network; data gap.
+PUMP-08,2025-09-14T04:18:00Z,MACHINE,UNKNOWN,0.99,B3 IsolationForest: fluid_temp_c z=-6.2,Inspect pump.

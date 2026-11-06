@@ -1,0 +1,423 @@
+# RETROFIT AI 2026 - public fleet configuration (training + validation assets).
+# All sites, vessels and assets are fictional. Ratings are chosen to be internally consistent
+# (hydraulic power / efficiency / motor rating) and inside the ranges documented in docs/TECHNICAL_MODEL.md.
+# Test-split assets are defined in the organizer package only.
+
+dataset_version: "1.0.0"
+public_seed: 20261106
+
+profiles:
+  SHIP_SW_COOLING:           # open seawater circuit: sea chest -> strainer -> pump -> central cooler (plate HX) -> overboard
+    salinity_psu: 6.0
+    control: VFD_TEMPERATURE
+    voltage_v: 440
+    supply_hz: 60
+    h0_shutoff_ratio: 1.22
+    system_static_m: 3.0     # overboard discharge above waterline
+    suction_loss_m_at_design: 0.9
+    strainer_share: 0.65
+    valve_share_of_K: 0.15
+    valve_design_position: 0.9
+    design_supply_temp_c: 25.0   # Baltic-trade design sea temperature (assumption); full design flow at full load
+    controlled_temp_setpoint_c: 36.0
+    min_flow_frac: 0.40
+    r_min: 0.50
+    r_max: 1.0
+    speed_tau_s: 25.0
+    startup_ramp_s: 12.0
+    coastdown_tau_s: 7.0
+    roll_period_s: 11.0
+    vfd_efficiency: 0.97
+    rated_slip: 0.012
+    inrush_multiple: 6.5
+    bearing_rise_k: 24.0
+    bearing_tau_s: 1500.0
+    winding_rise_k: 70.0
+    winding_tau_s: 2400.0
+    const_loss_share: 0.35
+    level_measured: false
+    wireless_update_s: 300
+    context:
+      sea_leg_h: 10.5
+      manoeuvre_h: 0.6
+      port_h: 1.4
+      demand_sea: 0.88
+      demand_manoeuvre: 0.62
+      demand_port: 0.38
+      engine_room_c: 36.0
+      sea_chest_submergence_m: 4.8
+      standby_prob: 0.5
+      storm_prob: 0.5
+      startup_s: 12
+      shutdown_s: 15
+  SHIP_LT_FRESHWATER:         # closed low-temperature fresh-water loop (central cooler -> engine/aux consumers), expansion-tank pressurised
+    salinity_psu: 0.0
+    control: FIXED_SPEED
+    voltage_v: 440
+    supply_hz: 60
+    h0_shutoff_ratio: 1.20
+    system_static_m: 0.0
+    loop_pressurisation_kpa: 120.0
+    suction_loss_m_at_design: 0.6
+    strainer_share: 0.5
+    valve_share_of_K: 0.20
+    valve_design_position: 0.85
+    loop_temp_c: 34.0
+    startup_ramp_s: 4.0
+    coastdown_tau_s: 8.0
+    rated_slip: 0.013
+    inrush_multiple: 6.8
+    bearing_rise_k: 22.0
+    bearing_tau_s: 1500.0
+    winding_rise_k: 72.0
+    winding_tau_s: 2400.0
+    const_loss_share: 0.35
+    level_measured: false
+    wireless_update_s: 300
+    context:
+      sea_leg_h: 10.5
+      manoeuvre_h: 0.6
+      port_h: 1.4
+      demand_sea: 0.9
+      demand_manoeuvre: 0.65
+      demand_port: 0.4
+      engine_room_c: 36.0
+      sea_chest_submergence_m: 4.8
+      standby_prob: 0.4
+      storm_prob: 0.4
+      startup_s: 6
+      shutdown_s: 12
+  INDUSTRIAL_CW:              # cooling-tower basin -> pump -> process heat exchangers -> tower distribution
+    salinity_psu: 0.0
+    control: VFD_PRESSURE
+    voltage_v: 400
+    supply_hz: 50
+    h0_shutoff_ratio: 1.20
+    system_static_m: 7.0
+    suction_loss_m_at_design: 0.7
+    strainer_share: 0.6
+    valve_share_of_K: 0.30
+    valve_design_position: 0.75
+    r_min: 0.55
+    r_max: 1.0
+    speed_tau_s: 15.0
+    startup_ramp_s: 10.0
+    coastdown_tau_s: 8.0
+    vfd_efficiency: 0.97
+    rated_slip: 0.015
+    inrush_multiple: 6.5
+    bearing_rise_k: 24.0
+    bearing_tau_s: 1500.0
+    winding_rise_k: 72.0
+    winding_tau_s: 2400.0
+    const_loss_share: 0.35
+    level_measured: true
+    wireless_update_s: 300
+    context:
+      shift_hours: [6, 22]
+      demand_shift: 0.9
+      demand_night: 0.55
+      demand_weekend: 0.45
+      hall_c: 22.0
+      suction_static_m: 2.5
+      stop_prob: 0.5
+      startup_s: 10
+      shutdown_s: 10
+  PROCESS_TRANSFER:           # smaller hot-process-water transfer pump, batch cycles, flow-control valve
+    salinity_psu: 0.0
+    control: FLOW_VALVE
+    voltage_v: 400
+    supply_hz: 50
+    h0_shutoff_ratio: 1.18
+    system_static_m: 8.0
+    suction_loss_m_at_design: 0.5
+    strainer_share: 0.7
+    valve_share_of_K: 0.35
+    valve_design_position: 0.7
+    valve_tau_s: 6.0
+    startup_ramp_s: 3.0
+    coastdown_tau_s: 4.0
+    rated_slip: 0.025
+    inrush_multiple: 7.0
+    bearing_rise_k: 26.0
+    bearing_tau_s: 1100.0
+    winding_rise_k: 75.0
+    winding_tau_s: 1500.0
+    const_loss_share: 0.35
+    level_measured: true
+    wireless_update_s: 300
+    context:
+      run_h: [1.0, 4.0]
+      idle_h: [0.2, 1.5]
+      setpoints: [0.6, 0.75, 0.9, 1.0]
+      process_temp_c: 62.0
+      hall_c: 26.0
+      suction_static_m: 2.2
+      startup_s: 4
+      shutdown_s: 6
+
+# ------------------------------------------------------------------------------------------------------
+# Assets. Scenario entries: type, onset_h (hours from window start; negative = pre-existing), end_h (repair or
+# resolution; omit = persists), repair_h (locked-out maintenance stop after end_h), params (latent-process
+# parameters, see docs/TECHNICAL_MODEL.md section 5), sensor_tag (instrument faults), root_cause (index of the
+# causing scenario entry, 1-based, for compound incidents). Onsets receive seeded jitter.
+# ------------------------------------------------------------------------------------------------------
+assets:
+  - asset_id: PUMP-01
+    split: train
+    site: "Vessel A (RoPax, fictional)"
+    system: "Seawater cooling, pump No. 1"
+    profile: SHIP_SW_COOLING
+    start_utc: "2025-08-11T00:00:00"
+    commissioned_year: 2009
+    instrumentation_tier: T1_RETROFIT
+    q_bep_m3h: 520
+    h_bep_m: 26.0
+    eta_bep: 0.82
+    npshr_bep_m: 4.2
+    q_design_m3h: 500
+    h_design_m: 25.5
+    motor_kw: 55
+    motor_eff: 0.950
+    motor_pf: 0.86
+    rated_rpm: 1780
+    vib_base_mm_s: 1.1
+    unbalance_base_mm_s: 0.6
+    hydraulic_vib_mm_s: 1.0
+    cavitation_vib_mm_s: 3.0
+    accel_base_g: 0.16
+    scenario:
+      - {type: SUCTION_STRAINER_CLOGGING, onset_h: 22, end_h: 64, repair_h: 1.5, params: {rate_per_h: 0.055, c_max: 3.0, shape: linear}}
+      - {type: SUCTION_STRAINER_CLOGGING, onset_h: 118, params: {rate_per_h: 0.04, c_max: 3.0, shape: linear}}
+      - {type: COMMUNICATION_LOSS, sensor_tag: GATEWAY, onset_h: 90, end_h: 92.5, jitter_h: 6}
+      - {type: SENSOR_STUCK, sensor_tag: bearing_temp_c, onset_h: 140, end_h: 166, jitter_h: 4}
+  - asset_id: PUMP-02
+    split: train
+    site: "Vessel A (RoPax, fictional)"
+    system: "Seawater cooling, pump No. 2"
+    profile: SHIP_SW_COOLING
+    start_utc: "2025-12-01T00:00:00"
+    commissioned_year: 2009
+    instrumentation_tier: T2_FULL
+    q_bep_m3h: 520
+    h_bep_m: 26.0
+    eta_bep: 0.81
+    npshr_bep_m: 4.2
+    q_design_m3h: 500
+    h_design_m: 25.5
+    motor_kw: 55
+    motor_eff: 0.950
+    motor_pf: 0.86
+    rated_rpm: 1780
+    vib_base_mm_s: 1.3
+    unbalance_base_mm_s: 0.7
+    hydraulic_vib_mm_s: 1.0
+    cavitation_vib_mm_s: 3.0
+    accel_base_g: 0.17
+    context: {standby_prob: 0.0}
+    scenario:
+      - {type: BEARING_WEAR, onset_h: -96, end_h: 132, repair_h: 7, params: {rate_per_h: 0.012, t_fail_h: 236}, jitter_h: 3}
+      - {type: MISALIGNMENT, onset_h: 139.5, params: {level: 0.55, growth_per_h: 0.004}, root_cause: 1, jitter_h: 0}
+      - {type: SENSOR_DRIFT, sensor_tag: suction_pressure_kpa, onset_h: 20, end_h: 110, params: {drift_per_h: 0.35}, jitter_h: 6}
+  - asset_id: PUMP-03
+    split: train
+    site: "Vessel A (RoPax, fictional)"
+    system: "LT fresh-water central cooling, pump No. 1"
+    profile: SHIP_LT_FRESHWATER
+    start_utc: "2026-03-02T00:00:00"
+    commissioned_year: 2009
+    instrumentation_tier: T0_LEGACY
+    q_bep_m3h: 400
+    h_bep_m: 32.0
+    eta_bep: 0.80
+    npshr_bep_m: 3.6
+    q_design_m3h: 380
+    h_design_m: 31.0
+    motor_kw: 55
+    motor_eff: 0.948
+    motor_pf: 0.87
+    rated_rpm: 1775
+    vib_base_mm_s: 1.4
+    unbalance_base_mm_s: 0.7
+    hydraulic_vib_mm_s: 1.0
+    cavitation_vib_mm_s: 2.5
+    accel_base_g: 0.18
+    scenario:
+      - {type: DISCHARGE_RESTRICTION, onset_h: 46, end_h: 98, repair_h: 1.0, params: {rate_per_h: 3.0, extra_max: 0.9, shape: exp}}
+      - {type: SENSOR_CALIBRATION_SHIFT, sensor_tag: discharge_pressure_kpa, onset_h: 99.5, end_h: 150, params: {step: 18.0}, root_cause: 1, jitter_h: 0}
+      - {type: IMPELLER_WEAR, onset_h: -500, params: {rate_per_h: 0.00006, iw0: 0.03, iw_max: 0.12}, jitter_h: 0}
+  - asset_id: PUMP-04
+    split: train
+    site: "Plant C (food processing, fictional)"
+    system: "Cooling-tower circulation pump CW-1"
+    profile: INDUSTRIAL_CW
+    start_utc: "2025-06-16T00:00:00"
+    commissioned_year: 2014
+    instrumentation_tier: T2_FULL
+    q_bep_m3h: 320
+    h_bep_m: 33.0
+    eta_bep: 0.81
+    npshr_bep_m: 3.4
+    q_design_m3h: 300
+    h_design_m: 32.0
+    motor_kw: 45
+    motor_eff: 0.945
+    motor_pf: 0.86
+    rated_rpm: 1480
+    vib_base_mm_s: 1.2
+    unbalance_base_mm_s: 0.6
+    hydraulic_vib_mm_s: 1.1
+    cavitation_vib_mm_s: 3.0
+    accel_base_g: 0.15
+    dp_setpoint_m: 27.0
+    scenario:
+      - {type: IMBALANCE, onset_h: 18, params: {rate_per_h: 0.009, u_max: 1.4, shape: linear}}
+      - {type: BEARING_WEAR, onset_h: -60, end_h: 129, repair_h: 6.0, params: {rate_per_h: 0.012, t_fail_h: 180}, jitter_h: 2}
+      - {type: SENSOR_NOISE_SPIKES, sensor_tag: flow_m3_h, onset_h: 70, end_h: 82, params: {noise_mult: 4.0, spike_rate: 0.004, spike_size: 120.0}}
+      - {type: DISCHARGE_RESTRICTION, onset_h: 104, end_h: 150, repair_h: 4.0, params: {rate_per_h: 0.03, extra_max: 1.2, shape: exp}}
+  - asset_id: PUMP-05
+    split: train
+    site: "Plant C (food processing, fictional)"
+    system: "Process cooling-water pump CW-3 (fixed speed)"
+    profile: INDUSTRIAL_CW
+    control: FIXED_SPEED
+    start_utc: "2026-01-19T00:00:00"
+    commissioned_year: 1998
+    instrumentation_tier: T0_LEGACY
+    q_bep_m3h: 180
+    h_bep_m: 36.0
+    eta_bep: 0.76
+    npshr_bep_m: 3.0
+    q_design_m3h: 170
+    h_design_m: 35.0
+    motor_kw: 30
+    motor_eff: 0.936
+    motor_pf: 0.85
+    rated_rpm: 2955
+    vib_base_mm_s: 1.6
+    unbalance_base_mm_s: 0.8
+    hydraulic_vib_mm_s: 1.2
+    cavitation_vib_mm_s: 3.0
+    accel_base_g: 0.22
+    scenario:
+      - {type: IMPELLER_WEAR, onset_h: -200, params: {rate_per_h: 0.00005, iw0: 0.06, iw_max: 0.12}, jitter_h: 0}
+      - {type: SENSOR_STUCK, sensor_tag: discharge_pressure_kpa, onset_h: 60, end_h: 75, jitter_h: 6}
+      - {type: BEARING_WEAR, onset_h: 30, params: {rate_per_h: 0.01, t_fail_h: 300}, jitter_h: 6}
+  - asset_id: PUMP-06
+    split: train
+    site: "Plant D (chemical process, fictional)"
+    system: "Hot process-water transfer pump PT-2"
+    profile: PROCESS_TRANSFER
+    start_utc: "2025-10-06T00:00:00"
+    commissioned_year: 2006
+    instrumentation_tier: T1_RETROFIT
+    q_bep_m3h: 65
+    h_bep_m: 42.0
+    eta_bep: 0.70
+    npshr_bep_m: 3.2
+    q_design_m3h: 60
+    h_design_m: 41.0
+    motor_kw: 15
+    motor_eff: 0.920
+    motor_pf: 0.85
+    rated_rpm: 2930
+    vib_base_mm_s: 1.4
+    unbalance_base_mm_s: 0.7
+    hydraulic_vib_mm_s: 1.3
+    cavitation_vib_mm_s: 3.5
+    accel_base_g: 0.25
+    scenario:
+      - {type: PLANNED_MAINTENANCE, onset_h: 4, repair_h: 3.0, jitter_h: 1, params: {work_type: MECHANICAL_SEAL_REPLACEMENT, note: "Mechanical seal replaced (planned). Coupling refitted, pump restarted."}}
+      - {type: MISALIGNMENT, onset_h: 4, root_cause: 1, jitter_h: 0, params: {level: 0.40, growth_per_h: 0.002}}
+      - {type: SUCTION_STRAINER_CLOGGING, onset_h: 60, end_h: 112, repair_h: 2.0, params: {rate_per_h: 0.11, c_max: 6.0, shape: linear}}
+      - {type: SENSOR_DRIFT, sensor_tag: bearing_temp_c, onset_h: 125, params: {drift_per_h: 0.25}}
+  - asset_id: PUMP-07
+    split: train
+    site: "Vessel B (RoPax, fictional)"
+    system: "Seawater cooling, pump No. 1"
+    profile: SHIP_SW_COOLING
+    start_utc: "2025-05-12T00:00:00"
+    commissioned_year: 2016
+    instrumentation_tier: T2_FULL
+    q_bep_m3h: 650
+    h_bep_m: 24.0
+    eta_bep: 0.83
+    npshr_bep_m: 4.6
+    q_design_m3h: 620
+    h_design_m: 23.5
+    motor_kw: 75
+    motor_eff: 0.955
+    motor_pf: 0.86
+    rated_rpm: 1785
+    vib_base_mm_s: 1.0
+    unbalance_base_mm_s: 0.5
+    hydraulic_vib_mm_s: 0.9
+    cavitation_vib_mm_s: 3.0
+    accel_base_g: 0.15
+    r_min: 0.60
+    context: {storm_at_h: 121, hs_mean: 1.4}
+    scenario:
+      - {type: BEARING_WEAR, onset_h: 10, params: {rate_per_h: 0.008, t_fail_h: 400}}
+      - {type: SENSOR_CALIBRATION_SHIFT, sensor_tag: flow_m3_h, onset_h: 75, end_h: 120, params: {step: -45.0}}
+      - {type: AIR_ENTRAINMENT, onset_h: 127, end_h: 131, params: {alpha_max: 0.03}, jitter_h: 1}
+
+  - asset_id: PUMP-08
+    split: validation
+    site: "Vessel B (RoPax, fictional)"
+    system: "Seawater cooling, pump No. 2"
+    profile: SHIP_SW_COOLING
+    r_min: 0.60
+    start_utc: "2025-09-08T00:00:00"
+    commissioned_year: 2016
+    instrumentation_tier: T1_RETROFIT
+    q_bep_m3h: 650
+    h_bep_m: 24.0
+    eta_bep: 0.83
+    npshr_bep_m: 4.6
+    q_design_m3h: 620
+    h_design_m: 23.5
+    motor_kw: 75
+    motor_eff: 0.955
+    motor_pf: 0.86
+    rated_rpm: 1785
+    vib_base_mm_s: 1.1
+    unbalance_base_mm_s: 0.5
+    hydraulic_vib_mm_s: 0.9
+    cavitation_vib_mm_s: 3.0
+    accel_base_g: 0.15
+    scenario:
+      - {type: SUCTION_STRAINER_CLOGGING, onset_h: 40, end_h: 84, repair_h: 1.0, params: {rate_per_h: 0.06, c_max: 3.0, shape: linear}}
+      - {type: BEARING_WEAR, onset_h: -40, params: {rate_per_h: 0.01, t_fail_h: 300}}
+      - {type: COMMUNICATION_LOSS, sensor_tag: GATEWAY, onset_h: 120, end_h: 121.5, jitter_h: 5}
+      - {type: SENSOR_NOISE_SPIKES, sensor_tag: discharge_pressure_kpa, onset_h: 140, end_h: 150, params: {noise_mult: 5.0, spike_rate: 0.003, spike_size: 60.0}}
+  - asset_id: PUMP-09
+    split: validation
+    site: "Plant C (food processing, fictional)"
+    system: "Cooling-tower circulation pump CW-2 (fixed speed)"
+    profile: INDUSTRIAL_CW
+    control: FIXED_SPEED
+    start_utc: "2026-02-09T00:00:00"
+    commissioned_year: 2014
+    instrumentation_tier: T2_FULL
+    q_bep_m3h: 320
+    h_bep_m: 33.0
+    eta_bep: 0.81
+    npshr_bep_m: 3.4
+    q_design_m3h: 300
+    h_design_m: 32.0
+    motor_kw: 45
+    motor_eff: 0.945
+    motor_pf: 0.86
+    rated_rpm: 1480
+    vib_base_mm_s: 1.2
+    unbalance_base_mm_s: 0.6
+    hydraulic_vib_mm_s: 1.1
+    cavitation_vib_mm_s: 3.0
+    accel_base_g: 0.15
+    scenario:
+      - {type: MISALIGNMENT, onset_h: 30, end_h: 100, repair_h: 3.0, params: {level: 0.45, growth_per_h: 0.002}}
+      - {type: DISCHARGE_RESTRICTION, onset_h: 120, params: {rate_per_h: 1.5, extra_max: 0.7, shape: exp}}
+      - {type: SENSOR_STUCK, sensor_tag: bearing_temp_c, onset_h: 70, end_h: 90}
+      - {type: SENSOR_DRIFT, sensor_tag: motor_current_a, onset_h: 8, end_h: 60, params: {drift_per_h: 0.09}, jitter_h: 3}
+      - {type: SUCTION_LEVEL_DROP, onset_h: 148, end_h: 156, params: {drop_m: 1.9, ramp_h: 1.5}, jitter_h: 3}
+      - {type: AIR_ENTRAINMENT, onset_h: 149, end_h: 156, root_cause: 5, align: onset, params: {alpha_max: 0.025}}

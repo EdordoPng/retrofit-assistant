@@ -1,0 +1,97 @@
+table,column,type,unit,nullable,valid,description
+telemetry,asset_id,string,-,False,,Stable asset identifier (PUMP-01 ... PUMP-12).
+telemetry,timestamp_utc,"timestamp[ms, UTC]",-,False,,"Sample time, UTC. 1 s grid in the full tier, 10 s in the starter tier; rows are absent during gateway outages."
+telemetry,operating_mode,category,-,False,STOPPED|STARTING|RUNNING|STOPPING|LOCKED_OUT,"PLC operating state of the pump drive (from the motor starter / drive status, not from the fault model)."
+telemetry,motor_speed_rpm,float32,rpm,True,0|4000,Motor speed reported by the variable-speed drive. NULL for fixed-speed (DOL) assets.
+telemetry,motor_current_a,float32,A,True,0|600,Motor line current (RMS). Includes start-up inrush on direct-on-line assets.
+telemetry,motor_power_kw,float32,kW,True,0|200,Electrical input power (drive or power meter). NULL where no power measurement exists.
+telemetry,suction_pressure_kpa,float32,kPa(g),True,-100|600,"Pump suction pressure, gauge. NULL on assets without a suction transmitter."
+telemetry,discharge_pressure_kpa,float32,kPa(g),True,-100|1600,"Pump discharge pressure, gauge."
+telemetry,flow_m3_h,float32,m³/h,True,0|1200,Volumetric flow. NULL on assets without a flow meter.
+telemetry,fluid_temp_c,float32,°C,True,-20|120,Pumped-liquid temperature at the pump.
+telemetry,bearing_temp_c,float32,°C,True,-20|150,Pump drive-end bearing housing temperature. Sparse (every 300 s) on wireless retrofit sensors.
+telemetry,motor_winding_temp_c,float32,°C,True,-20|200,Motor stator winding temperature (PT100). Fully instrumented assets only.
+telemetry,vibration_rms_mm_s,float32,mm/s,True,0|50,"Overall vibration velocity RMS, 10-1000 Hz, pump bearing housing, radial."
+telemetry,vibration_accel_rms_g,float32,g,True,0|16,Overall acceleration RMS (high-frequency band) from the same sensor.
+telemetry,vibration_crest_factor,float32,-,True,1|20,Crest factor (peak/RMS) of the acceleration signal.
+telemetry,ambient_temp_c,float32,°C,True,-30|70,Machinery-space / pump-room air temperature (10 s update).
+telemetry,valve_position_pct,float32,%,True,0|100,Control-valve position feedback (process / pressure-controlled loops only).
+telemetry,quality_flags,int16,bitmask,False,0|31,"1 COMM_LOSS, 2 OUT_OF_RANGE, 4 STALE, 8 BAD_SENSOR_STATUS, 16 STARTUP_INHIBIT (4 and 8 reserved, not set in this release)."
+telemetry,sensor_source,string,-,False,,"Data sources present on the asset (PLC, VFD, WIRELESS, IOLINK, POWER_METER, FLOW_METER), separated by a pipe character."
+telemetry,sample_interval_s,int16,s,False,1|10,Nominal sampling interval of the row grid: 1 (full tier) or 10 (starter tier).
+assets,asset_id,string,-,False,,Asset identifier.
+assets,split,string,-,False,train|validation|test,Benchmark split. Test labels are not public.
+assets,site,string,-,False,,Fictional site / vessel.
+assets,system,string,-,False,,Duty within the site.
+assets,profile,string,-,False,SHIP_SW_COOLING|SHIP_LT_FRESHWATER|INDUSTRIAL_CW|PROCESS_TRANSFER,Equipment profile.
+assets,control,string,-,False,VFD_TEMPERATURE|VFD_PRESSURE|FLOW_VALVE|FIXED_SPEED,Capacity control method.
+assets,instrumentation_tier,string,-,False,T0_LEGACY|T1_RETROFIT|T2_FULL,Instrumentation level (see TECHNICAL_MODEL.md).
+assets,window_start_utc,timestamp,-,False,,First timestamp of the asset's data window.
+assets,window_end_utc,timestamp,-,False,,End (exclusive) of the data window.
+assets,commissioned_year,int,year,False,1980|2026,Installation year.
+assets,pump_rated_flow_m3_h,float,m³/h,False,,Best-efficiency-point flow at rated speed.
+assets,pump_rated_head_m,float,m,False,,Best-efficiency-point head at rated speed.
+assets,pump_shutoff_head_m,float,m,False,,"Head at zero flow, rated speed."
+assets,pump_bep_efficiency,float,-,False,0.5|0.9,Pump efficiency at BEP (nameplate / curve).
+assets,npsh3_at_bep_m,float,m,False,,"NPSH3 (3 % head drop) at BEP flow, rated speed."
+assets,design_flow_m3_h,float,m³/h,False,,System design flow.
+assets,design_head_m,float,m,False,,System design head.
+assets,static_head_m,float,m,False,,Static head of the system curve (0 for closed loops).
+assets,motor_rated_kw,float,kW,False,,Motor rated output.
+assets,motor_rated_current_a,float,A,False,,Motor rated current (derived from nameplate).
+assets,motor_rated_rpm,float,rpm,False,,Motor rated speed.
+assets,supply_voltage_v,float,V,False,,Line voltage.
+assets,supply_frequency_hz,float,Hz,False,50|60,Line frequency.
+assets,min_speed_ratio,float,-,True,0.3|1.0,Minimum drive speed (VFD assets).
+assets,fluid,string,-,False,,Pumped liquid.
+assets,bearing_designation,string,-,False,,Pump drive-end bearing (deep-groove ball bearing series).
+assets,bearing_bpfo_order,float,x running speed,False,,Outer-race defect frequency order (computed from bearing geometry).
+assets,bearing_bpfi_order,float,x running speed,False,,Inner-race defect frequency order.
+assets,impeller_vanes,int,-,False,,Number of impeller vanes (vane-pass frequency = vanes x running speed).
+assets,vibration_alarm_mm_s,float,mm/s,True,,Configured vibration alarm (ISO 10816-7 category based).
+assets,vibration_trip_mm_s,float,mm/s,True,,Configured vibration trip / HIHI.
+assets,channels_available,string,-,False,,"Telemetry columns that carry data for this asset, separated by a pipe character."
+assets,wireless_update_s,int,s,True,,Update interval of battery wireless sensors (T1).
+events,event_id,string,-,False,,Event identifier.
+events,asset_id,string,-,False,,Asset identifier.
+events,event_class,string,-,False,MACHINE|SENSOR,True fault class.
+events,fault_type,string,-,False,,True fault type (see BENCHMARK_RULES.md taxonomy).
+events,onset_utc,timestamp,-,False,,Physical onset (clipped to window start for pre-existing conditions).
+events,pre_existing,bool,-,False,,Condition already present at window start.
+events,detectable_utc,timestamp,-,True,,First time the effect exceeds 3 sigma of sensor noise on an instrumented channel (10-min mean). NULL = not observable with this asset's instrumentation.
+events,action_deadline_utc,timestamp,-,True,,"First time a conventional limit is reached while the fault is active (vibration alarm, cooling-flow shortfall, NPSH margin < 1.1). NULL if never reached in the window."
+events,end_utc,timestamp,-,True,,Repair / resolution time. NULL = persists past window end.
+events,severity,string,-,False,minor|moderate|severe,Peak severity within the window.
+events,evidence_channels,string,-,True,,"Instrumented channels that carried the earliest evidence, in order."
+events,observable,bool,-,False,,Whether the event is detectable with the asset's instruments (unobservable events are not scored).
+events,root_cause_event_id,string,-,True,,"Causing event for compound incidents. Process events that are not scored are written as TYPE:ID (PLANNED_MAINTENANCE:..., SUCTION_LEVEL_DROP:...); OPERATING_CONDITION when no fault caused it."
+events,sensor_tag,string,-,True,,Affected telemetry column for instrument faults (GATEWAY for communication loss).
+events,label_confidence,string,-,False,HIGH|MEDIUM,MEDIUM when the end time is not observed in the window or the episode is emergent.
+alarms,asset_id,string,-,False,,Asset identifier.
+alarms,tag,string,-,False,,"Alarmed telemetry column, INSTRUMENT or GATEWAY."
+alarms,alarm_type,string,-,False,HI|HIHI|LO|BAD_QUALITY|COMM_LOSS,Alarm kind.
+alarms,priority,int,-,False,1|3,1 = high.
+alarms,raised_utc,timestamp,-,False,,Alarm raised (after on-delay).
+alarms,cleared_utc,timestamp,-,True,,Alarm returned to normal (after deadband).
+alarms,acknowledged_utc,timestamp,-,True,,Operator acknowledgement (NULL = not acknowledged in time).
+alarms,value_at_raise,float,tag unit,True,,Displayed value when raised.
+alarms,limit,float,tag unit,True,,Configured limit.
+maintenance,record_id,string,-,False,,Work-order identifier.
+maintenance,asset_id,string,-,False,,Asset identifier.
+maintenance,work_type,string,-,False,,Intervention type.
+maintenance,start_utc,timestamp,-,False,,Work start.
+maintenance,end_utc,timestamp,-,False,,Work end.
+maintenance,operator_observation,string,-,False,,Free-text observation as recorded (may contain a wrong suspicion).
+maintenance,diagnosis_confidence,string,-,False,CONFIRMED|PROBABLE|UNCERTAIN,Recorded confidence of the finding.
+maintenance,planned,bool,-,False,,Planned (routine) or corrective work.
+maintenance,in_window,bool,-,False,,Inside the telemetry window.
+operating_context,asset_id,string,-,False,,Asset identifier.
+operating_context,timestamp_utc,timestamp,-,False,,1-min grid.
+operating_context,schedule_state,string,-,True,,"Schedule / voyage state from the vessel or plant system (sea passage, port, production, batch, ...)."
+operating_context,duty_demand_pct,float,%,False,0|120,Heat-load / duty demand signal from the plant system.
+operating_context,supply_water_temp_c,float,°C,False,,"Inlet water temperature reported by the plant system (seawater, tower basin, LT loop or process tank)."
+operating_context,sea_temp_c,float,°C,True,,Sea temperature at the sea chest (vessels only).
+operating_context,ambient_temp_c,float,°C,False,,Space ambient temperature from the building / vessel automation.
+operating_context,sea_state_hs_m,float,m,True,,Significant wave height from the vessel's weather routing (vessels only).
+operating_context,suction_static_head_m,float,m,True,,Suction level / submergence where a level transmitter exists.
+operating_context,controlled_setpoint,string,-,True,,Control set-point description.

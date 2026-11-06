@@ -1,0 +1,82 @@
+{
+  "dataset": "RETROFIT AI 2026 synthetic pump telemetry",
+  "synthetic": true,
+  "tier": "starter",
+  "generator_version": "1.0.0",
+  "file_count": 13,
+  "total_bytes": 9426839,
+  "telemetry_rows": {
+    "PUMP-01": 60074,
+    "PUMP-03": 60480,
+    "PUMP-04": 60480,
+    "PUMP-06": 60480,
+    "PUMP-08": 59879
+  },
+  "files": [
+    {
+      "path": "alarms.csv",
+      "bytes": 2750,
+      "sha256": "1acbb314165c256e69510af5873d8758f508bad69c0534f7a77528421236d57b"
+    },
+    {
+      "path": "assets.csv",
+      "bytes": 2800,
+      "sha256": "33a6a2e68b951569ff03c4b372cb6e4e08caefb5c607b4d7b9f7bac3d890f384"
+    },
+    {
+      "path": "benign_windows_train_validation.csv",
+      "bytes": 19419,
+      "sha256": "1cbb1e0359a17f16c3c680303c0dd7aff893d3d5aa1b951845716fb52dc26424"
+    },
+    {
+      "path": "data_dictionary.csv",
+      "bytes": 9439,
+      "sha256": "db816137b7e4b163ce990585ad2f5d1b0f45a4ddd8dc5e95efbf85857e248a8d"
+    },
+    {
+      "path": "events_train.csv",
+      "bytes": 3816,
+      "sha256": "fe099d42826aba25ac850fc9508c6569402d55b65a29a1f65822b81f833ab7dd"
+    },
+    {
+      "path": "events_validation.csv",
+      "bytes": 905,
+      "sha256": "70dfecf237812f84687e906c17eed9ce00fa0f9b4f77b16edc28830a7e588c92"
+    },
+    {
+      "path": "maintenance.csv",
+      "bytes": 39952,
+      "sha256": "f310c5ed4394e174f4042fd7bb865091db8b92a913d92f44f6a35c6e407b7404"
+    },
+    {
+      "path": "operating_context.csv",
+      "bytes": 4844895,
+      "sha256": "086ba366631ecf0b476c780fb81caf47b071aa809f3f3ff869208ea454286ad1"
+    },
+    {
+      "path": "provenance.md",
+      "bytes": 771,
+      "sha256": "4419d583553b08c59ba3b49e8ea0801477015575adb838661a5f054e6c9178dc"
+    },
+    {
+      "path": "schema.json",
+      "bytes": 21979,
+      "sha256": "ab07d61da7c6cecfcdef6afb823303674cae51512c46a9c32743400f273565ce"
+    },
+    {
+      "path": "simulation_assumptions.md",
+      "bytes": 2859,
+      "sha256": "3955f7db21a3769f25b0bc6a2d3afff82b9c6709236dee39fb369dadef25f14b"
+    },
+    {
+      "path": "telemetry.csv.gz",
+      "bytes": 4475485,
+      "sha256": "82b55e89c8ac89c288567c63c7d6de351df1f7e226b0c1d0dd68ebcce22df283"
+    },
+    {
+      "path": "units.md",
+      "bytes": 1769,
+      "sha256": "54eda64ca55093903af3f6b3ceb89158ebcb42e60d6129beb8eb997f068fbc3c"
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "retrofit-sim"
+version = "1.0.0"
+description = "RETROFIT AI 2026 synthetic centrifugal-pump benchmark: simulator, dataset writer, scorer, baselines and sandbox"
+readme = "README_FIRST.md"
+requires-python = ">=3.10"
+license = { text = "CC-BY-4.0 (data, docs); MIT (code) - see LICENSE_AND_PROVENANCE.md" }
+dependencies = [
+  "numpy>=1.26,<3", "pandas>=2.1,<4", "pyarrow>=14,<27", "scipy>=1.11,<2",
+  "scikit-learn>=1.3,<2", "matplotlib>=3.8,<4", "pyyaml>=6.0,<7",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.4,<10"]
+mqtt = ["paho-mqtt>=1.6,<3"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

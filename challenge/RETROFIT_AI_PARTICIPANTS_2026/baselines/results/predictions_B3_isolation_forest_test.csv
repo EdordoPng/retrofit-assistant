@@ -1,0 +1,30 @@
+asset_id,alert_time_utc,event_class,fault_type,confidence,evidence,recommended_action
+PUMP-10,2025-07-23T05:40:00Z,MACHINE,SUCTION_STRAINER_CLOGGING,0.99,"B3 IsolationForest: motor_current_a z=+5.0, motor_power_kw z=+4.8, suction_pressure_kpa z=-4.7",Inspect / clean suction strainer.
+PUMP-10,2025-07-23T19:31:00Z,MACHINE,SUCTION_STRAINER_CLOGGING,0.99,"B3 IsolationForest: suction_pressure_kpa z=-11.2, motor_current_a z=+5.2, motor_power_kw z=+4.8",Inspect / clean suction strainer.
+PUMP-10,2025-07-24T07:46:00Z,MACHINE,SUCTION_STRAINER_CLOGGING,0.99,"B3 IsolationForest: suction_pressure_kpa z=-26.1, motor_current_a z=+10.4, motor_power_kw z=+8.3",Inspect / clean suction strainer.
+PUMP-10,2025-07-25T20:13:00Z,SENSOR,COMMUNICATION_LOSS,0.6527613630194413,B3 IsolationForest: missing rows,Check gateway / network; data gap.
+PUMP-11,2026-04-25T08:45:00Z,SENSOR,SENSOR_STUCK,0.8381671378950797,B3 IsolationForest: discharge_pressure_kpa frozen,Check transmitter discharge_pressure_kpa.
+PUMP-12,2025-11-24T03:20:00Z,MACHINE,UNKNOWN,0.99,B3 IsolationForest: bearing_temp_c z=-5.1,Inspect pump.
+PUMP-12,2025-11-24T07:21:00Z,MACHINE,SUCTION_STRAINER_CLOGGING,0.99,"B3 IsolationForest: bearing_temp_c z=-6.8, valve_position_pct z=+6.3, flow_m3_h z=+5.5",Inspect / clean suction strainer.
+PUMP-12,2025-11-24T15:26:00Z,MACHINE,UNKNOWN,0.99,B3 IsolationForest: bearing_temp_c z=-6.5,Inspect pump.
+PUMP-12,2025-11-25T05:31:00Z,MACHINE,UNKNOWN,0.99,B3 IsolationForest: bearing_temp_c z=-5.1,Inspect pump.
+PUMP-12,2025-11-25T10:10:00Z,MACHINE,SUCTION_STRAINER_CLOGGING,0.99,"B3 IsolationForest: valve_position_pct z=+6.4, discharge_pressure_kpa z=-6.1, bearing_temp_c z=-5.7",Inspect / clean suction strainer.
+PUMP-12,2025-11-25T18:51:00Z,MACHINE,UNKNOWN,0.99,B3 IsolationForest: ,Inspect pump.
+PUMP-12,2025-11-25T23:48:00Z,MACHINE,DISCHARGE_RESTRICTION,0.99,"B3 IsolationForest: flow_m3_h z=-4.1, valve_position_pct z=-4.0",Check discharge valves and heat-exchanger fouling.
+PUMP-12,2025-11-26T01:27:00Z,MACHINE,SUCTION_STRAINER_CLOGGING,0.99,"B3 IsolationForest: valve_position_pct z=+7.5, flow_m3_h z=+6.2, discharge_pressure_kpa z=-6.2",Inspect / clean suction strainer.
+PUMP-12,2025-11-26T15:37:00Z,MACHINE,UNKNOWN,0.99,B3 IsolationForest: bearing_temp_c z=-6.4,Inspect pump.
+PUMP-12,2025-11-26T19:01:00Z,MACHINE,SUCTION_STRAINER_CLOGGING,0.99,"B3 IsolationForest: suction_pressure_kpa z=-7.5, bearing_temp_c z=-5.8, discharge_pressure_kpa z=-4.3",Inspect / clean suction strainer.
+PUMP-12,2025-11-27T07:30:00Z,MACHINE,SUCTION_STRAINER_CLOGGING,0.99,"B3 IsolationForest: suction_pressure_kpa z=-17.4, discharge_pressure_kpa z=-11.3, bearing_temp_c z=-6.8",Inspect / clean suction strainer.
+PUMP-12,2025-11-27T10:25:00Z,MACHINE,BEARING_WEAR,0.99,"B3 IsolationForest: suction_pressure_kpa z=-22.6, discharge_pressure_kpa z=-15.2, valve_position_pct z=+6.6",Inspect pump bearing; plan replacement; check lubrication.
+PUMP-12,2025-11-27T22:28:00Z,MACHINE,BEARING_WEAR,0.99,"B3 IsolationForest: vibration_accel_rms_g z=+116.0, discharge_pressure_kpa z=-30.9, vibration_rms_mm_s z=+29.8",Inspect pump bearing; plan replacement; check lubrication.
+PUMP-12,2025-11-28T06:37:00Z,MACHINE,UNKNOWN,0.99,B3 IsolationForest: bearing_temp_c z=-6.1,Inspect pump.
+PUMP-12,2025-11-28T08:36:00Z,SENSOR,SENSOR_CALIBRATION_SHIFT,0.99,B3 IsolationForest: bearing_temp_c deviates alone (z=-4.3),Verify bearing_temp_c against a reference gauge.
+PUMP-12,2025-11-28T17:04:00Z,MACHINE,SUCTION_STRAINER_CLOGGING,0.99,"B3 IsolationForest: valve_position_pct z=+7.4, bearing_temp_c z=-6.3, discharge_pressure_kpa z=-6.2",Inspect / clean suction strainer.
+PUMP-12,2025-11-28T20:31:00Z,MACHINE,UNKNOWN,0.99,B3 IsolationForest: bearing_temp_c z=-5.5,Inspect pump.
+PUMP-12,2025-11-29T00:34:00Z,MACHINE,DISCHARGE_RESTRICTION,0.99,"B3 IsolationForest: flow_m3_h z=-5.9, bearing_temp_c z=-5.9",Check discharge valves and heat-exchanger fouling.
+PUMP-12,2025-11-29T09:48:00Z,MACHINE,UNKNOWN,0.99,"B3 IsolationForest: vibration_crest_factor z=+24.9, bearing_temp_c z=-6.3",Inspect pump.
+PUMP-12,2025-11-29T13:41:00Z,MACHINE,SUCTION_STRAINER_CLOGGING,0.99,"B3 IsolationForest: vibration_crest_factor z=+37.3, valve_position_pct z=+9.8, discharge_pressure_kpa z=-8.0",Inspect / clean suction strainer.
+PUMP-12,2025-11-30T00:01:00Z,MACHINE,UNKNOWN,0.99,"B3 IsolationForest: vibration_crest_factor z=+55.7, bearing_temp_c z=-7.0",Inspect pump.
+PUMP-12,2025-11-30T04:49:00Z,MACHINE,DISCHARGE_RESTRICTION,0.99,"B3 IsolationForest: vibration_crest_factor z=+58.2, bearing_temp_c z=-6.2, flow_m3_h z=-5.3",Check discharge valves and heat-exchanger fouling.
+PUMP-12,2025-11-30T09:31:00Z,MACHINE,BEARING_WEAR,0.99,"B3 IsolationForest: vibration_crest_factor z=+59.6, bearing_temp_c z=-6.5, vibration_accel_rms_g z=+4.7",Inspect pump bearing; plan replacement; check lubrication.
+PUMP-12,2025-11-30T21:45:00Z,MACHINE,BEARING_WEAR,0.99,"B3 IsolationForest: vibration_crest_factor z=+57.4, vibration_accel_rms_g z=+14.3, bearing_temp_c z=-4.0",Inspect pump bearing; plan replacement; check lubrication.

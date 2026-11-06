@@ -1,0 +1,28 @@
+asset_id,alert_time_utc,event_class,fault_type,confidence,evidence,recommended_action
+PUMP-10,2025-07-23T15:01:00Z,MACHINE,SUCTION_STRAINER_CLOGGING,0.5138885577519735,B1 mode-aware z: motor_speed_rpm z=+6.2,Inspect / clean suction strainer.
+PUMP-10,2025-07-24T02:43:00Z,MACHINE,IMPELLER_WEAR,0.5338812669118246,B1 mode-aware z: discharge_pressure_kpa z=-6.4,Performance test; inspect impeller / wear rings.
+PUMP-10,2025-07-25T20:18:00Z,SENSOR,COMMUNICATION_LOSS,0.05,B1 mode-aware z: missing rows,Check gateway / network; data gap.
+PUMP-11,2026-04-20T22:21:00Z,MACHINE,UNKNOWN,0.5625001192092896,B1 mode-aware z: fluid_temp_c z=+6.8,Inspect pump.
+PUMP-11,2026-04-23T08:34:00Z,MACHINE,UNKNOWN,0.5592592159907023,B1 mode-aware z: fluid_temp_c z=+6.7,Inspect pump.
+PUMP-11,2026-04-24T04:34:00Z,MACHINE,UNKNOWN,0.7700568040211996,"B1 mode-aware z: motor_power_kw z=-9.2, motor_speed_rpm z=-7.4, motor_current_a z=-7.2",Inspect pump.
+PUMP-11,2026-04-25T08:50:00Z,SENSOR,SENSOR_STUCK,0.39281610647837323,B1 mode-aware z: discharge_pressure_kpa frozen,Check transmitter discharge_pressure_kpa.
+PUMP-11,2026-04-26T11:38:00Z,MACHINE,UNKNOWN,0.8916825453440348,B1 mode-aware z: fluid_temp_c z=+10.7,Inspect pump.
+PUMP-12,2025-11-24T07:26:00Z,MACHINE,UNKNOWN,0.515180508295695,B1 mode-aware z: valve_position_pct z=+6.2,Inspect pump.
+PUMP-12,2025-11-24T08:06:00Z,MACHINE,SUCTION_STRAINER_CLOGGING,0.6126181284586588,"B1 mode-aware z: valve_position_pct z=+7.4, motor_power_kw z=+6.1, flow_m3_h z=+6.1",Inspect / clean suction strainer.
+PUMP-12,2025-11-24T22:20:00Z,MACHINE,UNKNOWN,0.99,B1 mode-aware z: ,Inspect pump.
+PUMP-12,2025-11-25T10:31:00Z,MACHINE,SUCTION_STRAINER_CLOGGING,0.674828052520752,"B1 mode-aware z: valve_position_pct z=+8.1, discharge_pressure_kpa z=-7.3, flow_m3_h z=+6.6",Inspect / clean suction strainer.
+PUMP-12,2025-11-25T11:40:00Z,MACHINE,UNKNOWN,0.5332432190577189,"B1 mode-aware z: valve_position_pct z=+6.4, discharge_pressure_kpa z=-6.2",Inspect pump.
+PUMP-12,2025-11-26T01:32:00Z,MACHINE,UNKNOWN,0.5602251291275024,B1 mode-aware z: valve_position_pct z=+6.7,Inspect pump.
+PUMP-12,2025-11-26T06:58:00Z,MACHINE,SUCTION_STRAINER_CLOGGING,0.9005091190338135,"B1 mode-aware z: valve_position_pct z=+8.5, discharge_pressure_kpa z=-7.6, flow_m3_h z=+6.6",Inspect / clean suction strainer.
+PUMP-12,2025-11-26T19:06:00Z,MACHINE,SUCTION_STRAINER_CLOGGING,0.654455304145813,B1 mode-aware z: suction_pressure_kpa z=-7.9,Inspect / clean suction strainer.
+PUMP-12,2025-11-27T07:35:00Z,MACHINE,SUCTION_STRAINER_CLOGGING,0.99,"B1 mode-aware z: suction_pressure_kpa z=-18.5, discharge_pressure_kpa z=-12.0",Inspect / clean suction strainer.
+PUMP-12,2025-11-27T10:30:00Z,MACHINE,BEARING_WEAR,0.99,"B1 mode-aware z: suction_pressure_kpa z=-22.7, discharge_pressure_kpa z=-15.1, vibration_accel_rms_g z=+9.6",Inspect pump bearing; plan replacement; check lubrication.
+PUMP-12,2025-11-27T22:33:00Z,MACHINE,BEARING_WEAR,0.99,"B1 mode-aware z: vibration_accel_rms_g z=+120.6, discharge_pressure_kpa z=-33.4, vibration_rms_mm_s z=+30.9",Inspect pump bearing; plan replacement; check lubrication.
+PUMP-12,2025-11-28T07:26:00Z,MACHINE,UNKNOWN,0.6120573282241821,"B1 mode-aware z: valve_position_pct z=+7.3, discharge_pressure_kpa z=-6.1, flow_m3_h z=+6.0",Inspect pump.
+PUMP-12,2025-11-28T17:09:00Z,MACHINE,SUCTION_STRAINER_CLOGGING,0.6977709929148356,"B1 mode-aware z: valve_position_pct z=+8.4, discharge_pressure_kpa z=-7.0, motor_power_kw z=+6.2",Inspect / clean suction strainer.
+PUMP-12,2025-11-29T03:15:00Z,MACHINE,UNKNOWN,0.5819339354832967,"B1 mode-aware z: valve_position_pct z=+7.0, discharge_pressure_kpa z=-6.3",Inspect pump.
+PUMP-12,2025-11-29T16:27:00Z,MACHINE,UNKNOWN,0.99,B1 mode-aware z: vibration_crest_factor z=+43.3,Inspect pump.
+PUMP-12,2025-11-29T18:53:00Z,MACHINE,SUCTION_STRAINER_CLOGGING,0.99,"B1 mode-aware z: vibration_crest_factor z=+47.0, valve_position_pct z=+8.5, discharge_pressure_kpa z=-6.5",Inspect / clean suction strainer.
+PUMP-12,2025-11-30T04:54:00Z,MACHINE,UNKNOWN,0.99,B1 mode-aware z: vibration_crest_factor z=+60.1,Inspect pump.
+PUMP-12,2025-11-30T09:36:00Z,MACHINE,BEARING_WEAR,0.99,"B1 mode-aware z: vibration_crest_factor z=+61.2, vibration_accel_rms_g z=+6.3",Inspect pump bearing; plan replacement; check lubrication.
+PUMP-12,2025-11-30T21:50:00Z,MACHINE,BEARING_WEAR,0.99,"B1 mode-aware z: vibration_crest_factor z=+55.9, vibration_accel_rms_g z=+11.4",Inspect pump bearing; plan replacement; check lubrication.

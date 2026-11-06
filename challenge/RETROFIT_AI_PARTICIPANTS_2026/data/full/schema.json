@@ -1,0 +1,788 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RETROFIT AI 2026 dataset tables",
+  "tables": {
+    "telemetry": {
+      "asset_id": {
+        "type": "string",
+        "unit": "-",
+        "nullable": false,
+        "description": "Stable asset identifier (PUMP-01 ... PUMP-12)."
+      },
+      "timestamp_utc": {
+        "type": "timestamp[ms, UTC]",
+        "unit": "-",
+        "nullable": false,
+        "description": "Sample time, UTC. 1 s grid in the full tier, 10 s in the starter tier; rows are absent during gateway outages."
+      },
+      "operating_mode": {
+        "type": "category",
+        "unit": "-",
+        "nullable": false,
+        "valid": [
+          "STOPPED",
+          "STARTING",
+          "RUNNING",
+          "STOPPING",
+          "LOCKED_OUT"
+        ],
+        "description": "PLC operating state of the pump drive (from the motor starter / drive status, not from the fault model)."
+      },
+      "motor_speed_rpm": {
+        "type": "float32",
+        "unit": "rpm",
+        "nullable": true,
+        "valid": [
+          0,
+          4000
+        ],
+        "description": "Motor speed reported by the variable-speed drive. NULL for fixed-speed (DOL) assets."
+      },
+      "motor_current_a": {
+        "type": "float32",
+        "unit": "A",
+        "nullable": true,
+        "valid": [
+          0,
+          600
+        ],
+        "description": "Motor line current (RMS). Includes start-up inrush on direct-on-line assets."
+      },
+      "motor_power_kw": {
+        "type": "float32",
+        "unit": "kW",
+        "nullable": true,
+        "valid": [
+          0,
+          200
+        ],
+        "description": "Electrical input power (drive or power meter). NULL where no power measurement exists."
+      },
+      "suction_pressure_kpa": {
+        "type": "float32",
+        "unit": "kPa(g)",
+        "nullable": true,
+        "valid": [
+          -100,
+          600
+        ],
+        "description": "Pump suction pressure, gauge. NULL on assets without a suction transmitter."
+      },
+      "discharge_pressure_kpa": {
+        "type": "float32",
+        "unit": "kPa(g)",
+        "nullable": true,
+        "valid": [
+          -100,
+          1600
+        ],
+        "description": "Pump discharge pressure, gauge."
+      },
+      "flow_m3_h": {
+        "type": "float32",
+        "unit": "m³/h",
+        "nullable": true,
+        "valid": [
+          0,
+          1200
+        ],
+        "description": "Volumetric flow. NULL on assets without a flow meter."
+      },
+      "fluid_temp_c": {
+        "type": "float32",
+        "unit": "°C",
+        "nullable": true,
+        "valid": [
+          -20,
+          120
+        ],
+        "description": "Pumped-liquid temperature at the pump."
+      },
+      "bearing_temp_c": {
+        "type": "float32",
+        "unit": "°C",
+        "nullable": true,
+        "valid": [
+          -20,
+          150
+        ],
+        "description": "Pump drive-end bearing housing temperature. Sparse (every 300 s) on wireless retrofit sensors."
+      },
+      "motor_winding_temp_c": {
+        "type": "float32",
+        "unit": "°C",
+        "nullable": true,
+        "valid": [
+          -20,
+          200
+        ],
+        "description": "Motor stator winding temperature (PT100). Fully instrumented assets only."
+      },
+      "vibration_rms_mm_s": {
+        "type": "float32",
+        "unit": "mm/s",
+        "nullable": true,
+        "valid": [
+          0,
+          50
+        ],
+        "description": "Overall vibration velocity RMS, 10-1000 Hz, pump bearing housing, radial."
+      },
+      "vibration_accel_rms_g": {
+        "type": "float32",
+        "unit": "g",
+        "nullable": true,
+        "valid": [
+          0,
+          16
+        ],
+        "description": "Overall acceleration RMS (high-frequency band) from the same sensor."
+      },
+      "vibration_crest_factor": {
+        "type": "float32",
+        "unit": "-",
+        "nullable": true,
+        "valid": [
+          1,
+          20
+        ],
+        "description": "Crest factor (peak/RMS) of the acceleration signal."
+      },
+      "ambient_temp_c": {
+        "type": "float32",
+        "unit": "°C",
+        "nullable": true,
+        "valid": [
+          -30,
+          70
+        ],
+        "description": "Machinery-space / pump-room air temperature (10 s update)."
+      },
+      "valve_position_pct": {
+        "type": "float32",
+        "unit": "%",
+        "nullable": true,
+        "valid": [
+          0,
+          100
+        ],
+        "description": "Control-valve position feedback (process / pressure-controlled loops only)."
+      },
+      "quality_flags": {
+        "type": "int16",
+        "unit": "bitmask",
+        "nullable": false,
+        "valid": [
+          0,
+          31
+        ],
+        "description": "1 COMM_LOSS, 2 OUT_OF_RANGE, 4 STALE, 8 BAD_SENSOR_STATUS, 16 STARTUP_INHIBIT (4 and 8 reserved, not set in this release)."
+      },
+      "sensor_source": {
+        "type": "string",
+        "unit": "-",
+        "nullable": false,
+        "description": "Data sources present on the asset (PLC, VFD, WIRELESS, IOLINK, POWER_METER, FLOW_METER), separated by a pipe character."
+      },
+      "sample_interval_s": {
+        "type": "int16",
+        "unit": "s",
+        "nullable": false,
+        "valid": [
+          1,
+          10
+        ],
+        "description": "Nominal sampling interval of the row grid: 1 (full tier) or 10 (starter tier)."
+      }
+    },
+    "assets": {
+      "asset_id": {
+        "type": "string",
+        "unit": "-",
+        "nullable": false,
+        "description": "Asset identifier."
+      },
+      "split": {
+        "type": "string",
+        "unit": "-",
+        "nullable": false,
+        "valid": [
+          "train",
+          "validation",
+          "test"
+        ],
+        "description": "Benchmark split. Test labels are not public."
+      },
+      "site": {
+        "type": "string",
+        "unit": "-",
+        "nullable": false,
+        "description": "Fictional site / vessel."
+      },
+      "system": {
+        "type": "string",
+        "unit": "-",
+        "nullable": false,
+        "description": "Duty within the site."
+      },
+      "profile": {
+        "type": "string",
+        "unit": "-",
+        "nullable": false,
+        "valid": [
+          "SHIP_SW_COOLING",
+          "SHIP_LT_FRESHWATER",
+          "INDUSTRIAL_CW",
+          "PROCESS_TRANSFER"
+        ],
+        "description": "Equipment profile."
+      },
+      "control": {
+        "type": "string",
+        "unit": "-",
+        "nullable": false,
+        "valid": [
+          "VFD_TEMPERATURE",
+          "VFD_PRESSURE",
+          "FLOW_VALVE",
+          "FIXED_SPEED"
+        ],
+        "description": "Capacity control method."
+      },
+      "instrumentation_tier": {
+        "type": "string",
+        "unit": "-",
+        "nullable": false,
+        "valid": [
+          "T0_LEGACY",
+          "T1_RETROFIT",
+          "T2_FULL"
+        ],
+        "description": "Instrumentation level (see TECHNICAL_MODEL.md)."
+      },
+      "window_start_utc": {
+        "type": "timestamp",
+        "unit": "-",
+        "nullable": false,
+        "description": "First timestamp of the asset's data window."
+      },
+      "window_end_utc": {
+        "type": "timestamp",
+        "unit": "-",
+        "nullable": false,
+        "description": "End (exclusive) of the data window."
+      },
+      "commissioned_year": {
+        "type": "int",
+        "unit": "year",
+        "nullable": false,
+        "valid": [
+          1980,
+          2026
+        ],
+        "description": "Installation year."
+      },
+      "pump_rated_flow_m3_h": {
+        "type": "float",
+        "unit": "m³/h",
+        "nullable": false,
+        "description": "Best-efficiency-point flow at rated speed."
+      },
+      "pump_rated_head_m": {
+        "type": "float",
+        "unit": "m",
+        "nullable": false,
+        "description": "Best-efficiency-point head at rated speed."
+      },
+      "pump_shutoff_head_m": {
+        "type": "float",
+        "unit": "m",
+        "nullable": false,
+        "description": "Head at zero flow, rated speed."
+      },
+      "pump_bep_efficiency": {
+        "type": "float",
+        "unit": "-",
+        "nullable": false,
+        "valid": [
+          0.5,
+          0.9
+        ],
+        "description": "Pump efficiency at BEP (nameplate / curve)."
+      },
+      "npsh3_at_bep_m": {
+        "type": "float",
+        "unit": "m",
+        "nullable": false,
+        "description": "NPSH3 (3 % head drop) at BEP flow, rated speed."
+      },
+      "design_flow_m3_h": {
+        "type": "float",
+        "unit": "m³/h",
+        "nullable": false,
+        "description": "System design flow."
+      },
+      "design_head_m": {
+        "type": "float",
+        "unit": "m",
+        "nullable": false,
+        "description": "System design head."
+      },
+      "static_head_m": {
+        "type": "float",
+        "unit": "m",
+        "nullable": false,
+        "description": "Static head of the system curve (0 for closed loops)."
+      },
+      "motor_rated_kw": {
+        "type": "float",
+        "unit": "kW",
+        "nullable": false,
+        "description": "Motor rated output."
+      },
+      "motor_rated_current_a": {
+        "type": "float",
+        "unit": "A",
+        "nullable": false,
+        "description": "Motor rated current (derived from nameplate)."
+      },
+      "motor_rated_rpm": {
+        "type": "float",
+        "unit": "rpm",
+        "nullable": false,
+        "description": "Motor rated speed."
+      },
+      "supply_voltage_v": {
+        "type": "float",
+        "unit": "V",
+        "nullable": false,
+        "description": "Line voltage."
+      },
+      "supply_frequency_hz": {
+        "type": "float",
+        "unit": "Hz",
+        "nullable": false,
+        "valid": [
+          50,
+          60
+        ],
+        "description": "Line frequency."
+      },
+      "min_speed_ratio": {
+        "type": "float",
+        "unit": "-",
+        "nullable": true,
+        "valid": [
+          0.3,
+          1.0
+        ],
+        "description": "Minimum drive speed (VFD assets)."
+      },
+      "fluid": {
+        "type": "string",
+        "unit": "-",
+        "nullable": false,
+        "description": "Pumped liquid."
+      },
+      "bearing_designation": {
+        "type": "string",
+        "unit": "-",
+        "nullable": false,
+        "description": "Pump drive-end bearing (deep-groove ball bearing series)."
+      },
+      "bearing_bpfo_order": {
+        "type": "float",
+        "unit": "x running speed",
+        "nullable": false,
+        "description": "Outer-race defect frequency order (computed from bearing geometry)."
+      },
+      "bearing_bpfi_order": {
+        "type": "float",
+        "unit": "x running speed",
+        "nullable": false,
+        "description": "Inner-race defect frequency order."
+      },
+      "impeller_vanes": {
+        "type": "int",
+        "unit": "-",
+        "nullable": false,
+        "description": "Number of impeller vanes (vane-pass frequency = vanes x running speed)."
+      },
+      "vibration_alarm_mm_s": {
+        "type": "float",
+        "unit": "mm/s",
+        "nullable": true,
+        "description": "Configured vibration alarm (ISO 10816-7 category based)."
+      },
+      "vibration_trip_mm_s": {
+        "type": "float",
+        "unit": "mm/s",
+        "nullable": true,
+        "description": "Configured vibration trip / HIHI."
+      },
+      "channels_available": {
+        "type": "string",
+        "unit": "-",
+        "nullable": false,
+        "description": "Telemetry columns that carry data for this asset, separated by a pipe character."
+      },
+      "wireless_update_s": {
+        "type": "int",
+        "unit": "s",
+        "nullable": true,
+        "description": "Update interval of battery wireless sensors (T1)."
+      }
+    },
+    "events": {
+      "event_id": {
+        "type": "string",
+        "unit": "-",
+        "nullable": false,
+        "description": "Event identifier."
+      },
+      "asset_id": {
+        "type": "string",
+        "unit": "-",
+        "nullable": false,
+        "description": "Asset identifier."
+      },
+      "event_class": {
+        "type": "string",
+        "unit": "-",
+        "nullable": false,
+        "valid": [
+          "MACHINE",
+          "SENSOR"
+        ],
+        "description": "True fault class."
+      },
+      "fault_type": {
+        "type": "string",
+        "unit": "-",
+        "nullable": false,
+        "description": "True fault type (see BENCHMARK_RULES.md taxonomy)."
+      },
+      "onset_utc": {
+        "type": "timestamp",
+        "unit": "-",
+        "nullable": false,
+        "description": "Physical onset (clipped to window start for pre-existing conditions)."
+      },
+      "pre_existing": {
+        "type": "bool",
+        "unit": "-",
+        "nullable": false,
+        "description": "Condition already present at window start."
+      },
+      "detectable_utc": {
+        "type": "timestamp",
+        "unit": "-",
+        "nullable": true,
+        "description": "First time the effect exceeds 3 sigma of sensor noise on an instrumented channel (10-min mean). NULL = not observable with this asset's instrumentation."
+      },
+      "action_deadline_utc": {
+        "type": "timestamp",
+        "unit": "-",
+        "nullable": true,
+        "description": "First time a conventional limit is reached while the fault is active (vibration alarm, cooling-flow shortfall, NPSH margin < 1.1). NULL if never reached in the window."
+      },
+      "end_utc": {
+        "type": "timestamp",
+        "unit": "-",
+        "nullable": true,
+        "description": "Repair / resolution time. NULL = persists past window end."
+      },
+      "severity": {
+        "type": "string",
+        "unit": "-",
+        "nullable": false,
+        "valid": [
+          "minor",
+          "moderate",
+          "severe"
+        ],
+        "description": "Peak severity within the window."
+      },
+      "evidence_channels": {
+        "type": "string",
+        "unit": "-",
+        "nullable": true,
+        "description": "Instrumented channels that carried the earliest evidence, in order."
+      },
+      "observable": {
+        "type": "bool",
+        "unit": "-",
+        "nullable": false,
+        "description": "Whether the event is detectable with the asset's instruments (unobservable events are not scored)."
+      },
+      "root_cause_event_id": {
+        "type": "string",
+        "unit": "-",
+        "nullable": true,
+        "description": "Causing event for compound incidents. Process events that are not scored are written as TYPE:ID (PLANNED_MAINTENANCE:..., SUCTION_LEVEL_DROP:...); OPERATING_CONDITION when no fault caused it."
+      },
+      "sensor_tag": {
+        "type": "string",
+        "unit": "-",
+        "nullable": true,
+        "description": "Affected telemetry column for instrument faults (GATEWAY for communication loss)."
+      },
+      "label_confidence": {
+        "type": "string",
+        "unit": "-",
+        "nullable": false,
+        "valid": [
+          "HIGH",
+          "MEDIUM"
+        ],
+        "description": "MEDIUM when the end time is not observed in the window or the episode is emergent."
+      }
+    },
+    "alarms": {
+      "asset_id": {
+        "type": "string",
+        "unit": "-",
+        "nullable": false,
+        "description": "Asset identifier."
+      },
+      "tag": {
+        "type": "string",
+        "unit": "-",
+        "nullable": false,
+        "description": "Alarmed telemetry column, INSTRUMENT or GATEWAY."
+      },
+      "alarm_type": {
+        "type": "string",
+        "unit": "-",
+        "nullable": false,
+        "valid": [
+          "HI",
+          "HIHI",
+          "LO",
+          "BAD_QUALITY",
+          "COMM_LOSS"
+        ],
+        "description": "Alarm kind."
+      },
+      "priority": {
+        "type": "int",
+        "unit": "-",
+        "nullable": false,
+        "valid": [
+          1,
+          3
+        ],
+        "description": "1 = high."
+      },
+      "raised_utc": {
+        "type": "timestamp",
+        "unit": "-",
+        "nullable": false,
+        "description": "Alarm raised (after on-delay)."
+      },
+      "cleared_utc": {
+        "type": "timestamp",
+        "unit": "-",
+        "nullable": true,
+        "description": "Alarm returned to normal (after deadband)."
+      },
+      "acknowledged_utc": {
+        "type": "timestamp",
+        "unit": "-",
+        "nullable": true,
+        "description": "Operator acknowledgement (NULL = not acknowledged in time)."
+      },
+      "value_at_raise": {
+        "type": "float",
+        "unit": "tag unit",
+        "nullable": true,
+        "description": "Displayed value when raised."
+      },
+      "limit": {
+        "type": "float",
+        "unit": "tag unit",
+        "nullable": true,
+        "description": "Configured limit."
+      }
+    },
+    "maintenance": {
+      "record_id": {
+        "type": "string",
+        "unit": "-",
+        "nullable": false,
+        "description": "Work-order identifier."
+      },
+      "asset_id": {
+        "type": "string",
+        "unit": "-",
+        "nullable": false,
+        "description": "Asset identifier."
+      },
+      "work_type": {
+        "type": "string",
+        "unit": "-",
+        "nullable": false,
+        "description": "Intervention type."
+      },
+      "start_utc": {
+        "type": "timestamp",
+        "unit": "-",
+        "nullable": false,
+        "description": "Work start."
+      },
+      "end_utc": {
+        "type": "timestamp",
+        "unit": "-",
+        "nullable": false,
+        "description": "Work end."
+      },
+      "operator_observation": {
+        "type": "string",
+        "unit": "-",
+        "nullable": false,
+        "description": "Free-text observation as recorded (may contain a wrong suspicion)."
+      },
+      "diagnosis_confidence": {
+        "type": "string",
+        "unit": "-",
+        "nullable": false,
+        "valid": [
+          "CONFIRMED",
+          "PROBABLE",
+          "UNCERTAIN"
+        ],
+        "description": "Recorded confidence of the finding."
+      },
+      "planned": {
+        "type": "bool",
+        "unit": "-",
+        "nullable": false,
+        "description": "Planned (routine) or corrective work."
+      },
+      "in_window": {
+        "type": "bool",
+        "unit": "-",
+        "nullable": false,
+        "description": "Inside the telemetry window."
+      }
+    },
+    "operating_context": {
+      "asset_id": {
+        "type": "string",
+        "unit": "-",
+        "nullable": false,
+        "description": "Asset identifier."
+      },
+      "timestamp_utc": {
+        "type": "timestamp",
+        "unit": "-",
+        "nullable": false,
+        "description": "1-min grid."
+      },
+      "schedule_state": {
+        "type": "string",
+        "unit": "-",
+        "nullable": true,
+        "description": "Schedule / voyage state from the vessel or plant system (sea passage, port, production, batch, ...)."
+      },
+      "duty_demand_pct": {
+        "type": "float",
+        "unit": "%",
+        "nullable": false,
+        "valid": [
+          0,
+          120
+        ],
+        "description": "Heat-load / duty demand signal from the plant system."
+      },
+      "supply_water_temp_c": {
+        "type": "float",
+        "unit": "°C",
+        "nullable": false,
+        "description": "Inlet water temperature reported by the plant system (seawater, tower basin, LT loop or process tank)."
+      },
+      "sea_temp_c": {
+        "type": "float",
+        "unit": "°C",
+        "nullable": true,
+        "description": "Sea temperature at the sea chest (vessels only)."
+      },
+      "ambient_temp_c": {
+        "type": "float",
+        "unit": "°C",
+        "nullable": false,
+        "description": "Space ambient temperature from the building / vessel automation."
+      },
+      "sea_state_hs_m": {
+        "type": "float",
+        "unit": "m",
+        "nullable": true,
+        "description": "Significant wave height from the vessel's weather routing (vessels only)."
+      },
+      "suction_static_head_m": {
+        "type": "float",
+        "unit": "m",
+        "nullable": true,
+        "description": "Suction level / submergence where a level transmitter exists."
+      },
+      "controlled_setpoint": {
+        "type": "string",
+        "unit": "-",
+        "nullable": true,
+        "description": "Control set-point description."
+      }
+    },
+    "predictions": {
+      "asset_id": {
+        "type": "string",
+        "unit": "-",
+        "nullable": false,
+        "description": "Asset the alert refers to."
+      },
+      "alert_time_utc": {
+        "type": "timestamp ISO-8601",
+        "unit": "-",
+        "nullable": false,
+        "description": "Time the alert would have been raised (must only use data up to this time)."
+      },
+      "event_class": {
+        "type": "string",
+        "unit": "-",
+        "nullable": false,
+        "valid": [
+          "MACHINE",
+          "SENSOR"
+        ],
+        "description": "Predicted class: machine condition or instrument / data problem."
+      },
+      "fault_type": {
+        "type": "string",
+        "unit": "-",
+        "nullable": false,
+        "description": "Predicted fault type (taxonomy in BENCHMARK_RULES.md) or UNKNOWN."
+      },
+      "confidence": {
+        "type": "float",
+        "unit": "-",
+        "nullable": false,
+        "valid": [
+          0,
+          1
+        ],
+        "description": "Model confidence."
+      },
+      "evidence": {
+        "type": "string",
+        "unit": "-",
+        "nullable": true,
+        "description": "Short human-readable evidence (channels, deviations)."
+      },
+      "recommended_action": {
+        "type": "string",
+        "unit": "-",
+        "nullable": true,
+        "description": "Human-reviewable recommendation (inspection, maintenance, sensor check)."
+      }
+    }
+  }
+}

@@ -1,0 +1,5 @@
+event_id,asset_id,event_class,fault_type,onset_utc,pre_existing,detectable_utc,action_deadline_utc,end_utc,severity,evidence_channels,observable,root_cause_event_id,sensor_tag,label_confidence
+PUMP-08-E02,PUMP-08,MACHINE,BEARING_WEAR,2025-09-08T00:00:00Z,True,2025-09-10T15:51:06Z,,,minor,"vibration_crest_factor,vibration_accel_rms_g",True,,,MEDIUM
+PUMP-08-E01,PUMP-08,MACHINE,SUCTION_STRAINER_CLOGGING,2025-09-09T14:21:21Z,False,2025-09-09T15:51:04Z,2025-09-11T04:53:49Z,2025-09-11T10:51:15Z,moderate,"suction_pressure_kpa,discharge_pressure_kpa,motor_power_kw",True,,,HIGH
+PUMP-08-E03,PUMP-08,SENSOR,COMMUNICATION_LOSS,2025-09-12T23:51:59Z,False,2025-09-12T23:51:59Z,,2025-09-13T01:32:13Z,minor,GATEWAY,True,,GATEWAY,HIGH
+PUMP-08-E04,PUMP-08,SENSOR,SENSOR_NOISE_SPIKES,2025-09-13T20:13:54Z,False,2025-09-13T20:18:54Z,,2025-09-14T06:39:47Z,minor,discharge_pressure_kpa,True,,discharge_pressure_kpa,HIGH

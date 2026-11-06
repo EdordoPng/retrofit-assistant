@@ -1,0 +1,17 @@
+asset_id,alert_time_utc,event_class,fault_type,confidence,evidence,recommended_action
+PUMP-08,2025-09-10T15:35:00Z,MACHINE,SUCTION_STRAINER_CLOGGING,0.99,B3 IsolationForest: suction_pressure_kpa z=-7.2,Inspect / clean suction strainer.
+PUMP-08,2025-09-13T00:02:00Z,SENSOR,COMMUNICATION_LOSS,0.6527613630194413,B3 IsolationForest: missing rows,Check gateway / network; data gap.
+PUMP-09,2026-02-09T12:41:00Z,SENSOR,SENSOR_NOISE_SPIKES,0.99,B3 IsolationForest: motor_winding_temp_c deviates alone (z=-14.2),Verify motor_winding_temp_c against a reference gauge.
+PUMP-09,2026-02-10T06:23:00Z,MACHINE,IMBALANCE,0.99,"B3 IsolationForest: vibration_rms_mm_s z=+19.4, motor_winding_temp_c z=-14.8, bearing_temp_c z=-4.3",Inspect impeller for fouling / damage; balance.
+PUMP-09,2026-02-10T08:17:00Z,SENSOR,SENSOR_NOISE_SPIKES,0.99,B3 IsolationForest: vibration_rms_mm_s deviates alone (z=17.1),Verify vibration_rms_mm_s against a reference gauge.
+PUMP-09,2026-02-10T21:17:00Z,MACHINE,IMBALANCE,0.99,B3 IsolationForest: vibration_rms_mm_s z=+19.9,Inspect impeller for fouling / damage; balance.
+PUMP-09,2026-02-11T09:57:00Z,MACHINE,IMBALANCE,0.99,B3 IsolationForest: vibration_rms_mm_s z=+20.4,Inspect impeller for fouling / damage; balance.
+PUMP-09,2026-02-11T12:21:00Z,MACHINE,MISALIGNMENT,0.99,B3 IsolationForest: vibration_rms_mm_s z=+20.6,Check coupling alignment.
+PUMP-09,2026-02-12T00:15:00Z,SENSOR,SENSOR_STUCK,0.99,B3 IsolationForest: bearing_temp_c frozen,Check transmitter bearing_temp_c.
+PUMP-09,2026-02-12T18:50:00Z,MACHINE,MISALIGNMENT,0.99,B3 IsolationForest: vibration_rms_mm_s z=+25.9,Check coupling alignment.
+PUMP-09,2026-02-12T19:44:00Z,MACHINE,IMBALANCE,0.99,B3 IsolationForest: vibration_rms_mm_s z=+26.2,Inspect impeller for fouling / damage; balance.
+PUMP-09,2026-02-12T23:25:00Z,SENSOR,SENSOR_NOISE_SPIKES,0.99,B3 IsolationForest: vibration_rms_mm_s deviates alone (z=25.3),Verify vibration_rms_mm_s against a reference gauge.
+PUMP-09,2026-02-14T01:14:00Z,MACHINE,DISCHARGE_RESTRICTION,0.99,"B3 IsolationForest: flow_m3_h z=-11.2, motor_power_kw z=-7.1",Check discharge valves and heat-exchanger fouling.
+PUMP-09,2026-02-15T01:14:00Z,MACHINE,DISCHARGE_RESTRICTION,0.99,"B3 IsolationForest: flow_m3_h z=-23.5, motor_power_kw z=-14.2, discharge_pressure_kpa z=+8.9",Check discharge valves and heat-exchanger fouling.
+PUMP-09,2026-02-15T07:43:00Z,MACHINE,SUCTION_STRAINER_CLOGGING,0.99,"B3 IsolationForest: flow_m3_h z=-25.6, motor_power_kw z=-21.0, suction_pressure_kpa z=-9.6",Inspect / clean suction strainer.
+PUMP-09,2026-02-15T19:43:00Z,MACHINE,DISCHARGE_RESTRICTION,0.99,"B3 IsolationForest: flow_m3_h z=-22.9, motor_power_kw z=-14.1, discharge_pressure_kpa z=+9.6",Check discharge valves and heat-exchanger fouling.
