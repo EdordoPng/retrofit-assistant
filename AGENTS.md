@@ -33,8 +33,9 @@ Key docs to read before changing detection logic: `challenge/.../BENCHMARK_RULES
 ## Hard rules (benchmark integrity)
 1. **Test assets PUMP-10, PUMP-11, PUMP-12:** no tuning, no threshold selection, no labeling, no
    inspection for model decisions, no use of `baselines/results/*_test.csv` as a reference. Allowed
-   only: the final submission run and the causality test. Fit on train (PUMP-01..07), select on
-   validation (PUMP-08, 09).
+   only: submission runs (milestone safety CSVs and the final one) with output checked for format
+   validity only (columns, vocabulary, row count), and the causality test. Fit on train
+   (PUMP-01..07), select on validation (PUMP-08, 09).
 2. **Causality:** an alert at time t may use only data with timestamp <= t plus static `assets.csv`.
    No centered rolling windows, no whole-window normalization, no backward fill, no look-ahead.
    Every change to detection logic must keep the causality test passing.
