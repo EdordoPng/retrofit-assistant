@@ -20,5 +20,6 @@ python-dateutil==4.0.0
 PyYAML==6.0.3
 scikit-learn==1.9.1
 scipy==1.18.1
+setuptools==84.2.1
 threadpoolctl==3.8.0
 tzdata==2026.6
