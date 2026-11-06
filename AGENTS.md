@@ -18,7 +18,7 @@ Key docs to read before changing detection logic: `challenge/.../BENCHMARK_RULES
 ## Environment
 - Python 3.14, venv in `.venv` at repo root: `source .venv/bin/activate`
 - Setup from scratch:
-  `python -m pip install -r requirements-lock.txt && python -m pip install -e challenge/RETROFIT_AI_PARTICIPANTS_2026 --no-deps`
+  `python -m pip install -r requirements-lock.txt && python -m pip install -e challenge/RETROFIT_AI_PARTICIPANTS_2026 --no-build-isolation --no-deps && python -m pip install -e . --no-build-isolation --no-deps`
 - Data root: `challenge/RETROFIT_AI_PARTICIPANTS_2026/data/full` (pass as `--data`, never hard-code
   absolute paths). Prefer `features_1min.parquet`; read 1 Hz telemetry only when needed.
 

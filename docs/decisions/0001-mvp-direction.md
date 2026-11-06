@@ -181,3 +181,44 @@ residuals. The light classifier is out of scope unless P0 to P3 finish early.
 3. Is `rpm_at_capture` usable on direct-on-line assets for spectral analysis?
 4. How do unobservable events interact with matching? The code keeps them in, and the effect has
    not been measured.
+
+## Amendment 2026-11-06
+
+Accepted by the owner after the oracle review of the draft spec. Where this section differs from
+the text above, this section prevails. Details are in `docs/specs/mvp.md` and
+`docs/decisions/0002-stack.md`.
+
+Deviations from the Decision section:
+
+| Decision | Amended to |
+| --- | --- |
+| 1, causal B1 | Alert time is at least `window_start_utc` + 60 s. One estimator: baseline statistics are recomputed hourly on the available prefix and applied to the following hour, with an explicit regime fallback and minimum sample count. The pool stops growing at t0 + 24 h, which keeps results equal to published B1 from then on. |
+| 1, warm-up | Warm-up limits move from P0 to P1. `causal_b1` is frozen after they land, not at the end of P0. |
+| 2, truncation test | Cuts include deterministic points just before and after minute boundaries, as well as random points. Every intermediate is recomputed from scratch on truncated input. |
+| 3, safety submission | The first safety CSV precedes the truncation test and is regenerated once that test is green. It comes from a minimal `full` pipeline, causal core plus policy. `causal_b1` without policy stays the comparison reference. |
+| 3, format check | Validation is strict: columns, vocabulary, finite confidence in [0, 1], UTC, exclusive window end, malformed files and a header-only file. On test, only the format outcome is reported. |
+| 9, alert policy | A condition is a pump plus an evidence-channel family, with one alert per condition. There are no reminders in the submission. Alerts on one pump are at least 6 min apart, and an emitted alert is never revised. A stop or lockout clears pending evidence, and evaluation restarts fresh. |
+| New | Every input has an availability rule and joins are backward as-of only, with no backward fill, future interpolation or nearest join. P0 uses only `features_1min` and `assets.csv`. Context, snapshots and alarms enter in P1 and P2 under their own contracts. Alarms use `raised_utc` only. |
+| New | P0-1 includes a smoke gate. The official tests run separately, once, at the freeze. |
+| Stack | setuptools is pinned in `requirements-lock.txt`. Both packages install with `--no-build-isolation --no-deps`. |
+
+Changes to the delivery order:
+
+| Task | Scope | Min |
+| --- | --- | --- |
+| P0-1 | Scaffold, pinned setuptools, smoke gate | 25 |
+| P0-2 | Loader with availability contract | 30 |
+| P0-3 | Hourly `causal_b1` | 45 |
+| P0-4 | Minimal policy and scorer fixtures | 35 |
+| P0-5 | Writer, validator, first safety CSV | 25 |
+| P0-6 | Truncation test, regenerated safety CSV | 45 |
+| Margin | Unassigned | 65 |
+
+P0 keeps its 270-minute slot. Warm-up limits and `compare` automation move to P1. The reserve cut
+that moved warm-up to P1 only on overrun no longer applies.
+
+Consequences:
+- P1 now totals 265 minutes in a 240-minute slot. It relies on unused P0 margin, and the existing
+  cut order applies otherwise.
+- One alert per condition can cost a second detection on compound events that share a channel
+  family. This is measured on train in P1.
