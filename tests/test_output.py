@@ -16,6 +16,7 @@ from retrofit_sim.scoring import load_predictions
 from retrofit_assistant import cli, pipeline
 from retrofit_assistant.data import AVAILABILITY, InputContract, load_assets
 from retrofit_assistant.output import COLUMNS, Check, validate_file, write_predictions
+from retrofit_assistant.params import EVENT_CLASSES, FAULT_TYPES
 from retrofit_assistant.pipeline import run_detector
 
 
@@ -273,7 +274,10 @@ def test_run_detector_validation_pump08_and_until(monkeypatch):
     reference = run_detector(DATA, "validation", "causal_b1")
     full = run_detector(DATA, "validation")
     assert not reference.empty
-    assert_frame_equal(full, reference, check_exact=True)
+    identity = ["asset_id", "alert_time_utc", "confidence"]
+    assert len(full) == len(reference)
+    assert_frame_equal(full[identity], reference[identity], check_exact=True)
+    assert full.event_class.isin(EVENT_CLASSES).all() and full.fault_type.isin(FAULT_TYPES).all()
     cutoff = pump08(DATA, "validation").window_start_utc.iloc[0]
     assert run_detector(DATA, "validation", until=cutoff).empty
     with pytest.raises(ValueError):

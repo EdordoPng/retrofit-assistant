@@ -72,8 +72,11 @@ def _compare(complete, truncated, candidates, cut, detector):
             candidate = source.iloc[index].to_dict()
             if candidate["asset_id"] != asset:
                 continue
-            if all(candidate[col] == row[col] for col in emitted.columns if col != "alert_time_utc"):
-                match = index, pd.Timestamp(candidate["alert_time_utc"])
+            candidate_time = pd.Timestamp(candidate["alert_time_utc"])
+            last = previous.get(asset)
+            expected = candidate_time if last is None else max(candidate_time, last + spacing)
+            if time == expected:
+                match = index, candidate_time
                 break
         if match is None:
             return "spacing"
@@ -299,6 +302,16 @@ def test_spacing_with_real_policy(offsets, cut_minutes):
     assert _compare(emitted, changed, candidates, cut, "full") == "spacing"
     assert _compare(emitted, emitted, candidates.iloc[:1], cut, "full") == "spacing"
     assert _compare(candidates.iloc[:1], emitted, candidates, cut, "causal_b1") is not None
+
+
+def test_spacing_matches_rediagnosed_candidate_by_asset_and_time():
+    start = pd.Timestamp("2026-01-01T00:00:00Z")
+    candidates = _rows(start, (0, 3))
+    emitted = candidates.copy()
+    emitted.loc[1, "alert_time_utc"] = (start + pd.Timedelta(minutes=6)).isoformat()
+    emitted["fault_type"] = "SENSOR_DRIFT"
+    emitted["evidence"] = "physical ramp with stable coupled channels"
+    assert _compare(emitted, emitted, candidates, start + pd.Timedelta(minutes=4), "full") is None
 
 
 @pytest.mark.parametrize("asset", ["ARBITRARY", "PUMP-01", "PUMP-08"])

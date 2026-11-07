@@ -25,3 +25,25 @@ FAULT_TYPES = (
     "AIR_ENTRAINMENT", "SENSOR_DRIFT", "SENSOR_STUCK", "SENSOR_CALIBRATION_SHIFT",
     "SENSOR_NOISE_SPIKES", "COMMUNICATION_LOSS", "UNKNOWN",
 )
+
+# Coupled-channel stillness: published diagnose uses k / 3.
+COUPLED_STILL_FRACTION = 1 / 3
+# In a closed loop these actuators react to the measurement, so they are not
+# independent witnesses of a process-variable deviation (owner decision, fix 2).
+ACTUATOR_CHANNELS = ("n", "vp")
+ACCELEROMETER_CHANNELS = ("v", "a", "c")  # simulator: one accelerometer source
+WIRELESS_CHANNELS = ("v", "a", "c", "bt")  # TECHNICAL_MODEL instrumentation
+# TECHNICAL_MODEL §6 / plant.py: max winding tau=2400 s, bearing tau<=1500 s.
+# Three time constants leave ~5% thermal settling error (hypothesis, not train fit).
+THERMAL_SETTLE_MIN = 3 * 2400 // 60
+# Oracle section 3: physical-value blocks 10-30 min; brief requires <=B1_PERSIST.
+SHAPE_BLOCK_MIN = 10
+RAMP_MIN_HOURS = 2
+SHAPE_MIN_OBSERVATIONS = 3  # real updates, including 300 s wireless samples
+# Conservative shape separation hypotheses, in physical units using B1 noise floors.
+SHAPE_MIN_CHANGE_FLOORS = 3
+SHAPE_FIT_FRACTION = 0.25  # max single block jump versus fitted ramp displacement
+STEP_STABILITY_FRACTION = 0.25  # post-step MAD versus level change
+RAMP_MIN_R2 = 0.8
+NOISE_RECENT_MIN = 10  # persistence, rather than an isolated last-minute spike
+NOISE_MIN_DENSE_COUNT = 30  # simulator: wireless std is not meaningful

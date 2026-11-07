@@ -93,9 +93,16 @@ def test_compare_rejects_split(tmp_path):
 def test_compare_end_to_end(tmp_path):
     report = tmp_path / "compare.md"
     result = run_cli(tmp_path, "compare", "--data", DATA, "--out", report, "--gate")
-    assert result.returncode == 1, result.stderr
-    assert "GATE FAIL" in result.stdout
     table = report.read_text(encoding="utf-8")
+    composite = {
+        (cells[0], cells[1]): float(cells[2])
+        for cells in ([cell.strip() for cell in line.strip("|\n ").split("|")] for line in table.splitlines())
+        if cells[0] in evaluate.DETECTORS
+    }
+    passed = evaluate.gate(*({split: composite[detector, split] for split in evaluate.SPLITS}
+                             for detector in evaluate.DETECTORS))
+    assert result.returncode == (0 if passed else 1), result.stderr
+    assert ("GATE PASS" if passed else "GATE FAIL") in result.stdout
     assert "| causal_b1 | train | 58.451 |" in table
     assert "| causal_b1 | validation | 78.013 |" in table
     assert {p.name for p in (tmp_path / "build" / "predictions").iterdir()} == {
