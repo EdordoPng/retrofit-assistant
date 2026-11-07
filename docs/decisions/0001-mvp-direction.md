@@ -249,3 +249,7 @@ Consequences:
 - Reminders from `causal_b1` stay in the output until then.
 - The safety CSV is `apply_guarantees(causal_b1)` until an improved pipeline passes the C9 gate: score
   >= `causal_b1` on both splits and > on at least one. The gate does not apply in P0.
+
+## Amendment 2026-11-07, warm-up
+
+Accepted by the owner. Decision 1 has no warm-up phase: `causal_b1` has no physical or generic limits and is frozen as it stands, because first-day measurements gave 1 false-alert episode, 8 of 9 early events detected, and absolute checks stay in P2-2.
