@@ -46,7 +46,7 @@ def fleet_page(table, links):
 <style>{report.CSS}</style></head><body><h1>Fleet overview</h1>
 <p><strong>Advisory only: human review required.</strong> Detector: {DETECTOR_FREEZE}. Table generated at {esc(table["commit"])} (evaluation code only).</p>
 <table><thead><tr>{"".join(f"<th>{h}</th>" for h in HEADERS)}</tr></thead><tbody>{"".join(rows)}</tbody></table>
-<p>T0: existing signals only (legacy) · T1: low-cost retrofit (suction pressure, wireless vibration) · T2: fully instrumented.</p>
+<p>T0: existing signals only (legacy) · T1: low-cost retrofit (suction pressure, wireless vibration and temperature) · T2: fully instrumented.</p>
 <p>Official composite: {composite}.</p><h2>What each split means</h2><ul>{roles}</ul>
 <h2>Instrumentation ablation (same T2 events, channels masked)</h2>
 <table><thead><tr><th>Tier</th><th>Split</th><th>Pumps</th><th>Composite</th><th>Detected / scored</th><th>Type correct</th></tr></thead>

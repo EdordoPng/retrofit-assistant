@@ -163,7 +163,7 @@ def test_fleet_is_self_contained_and_uses_brand_css_variables(table):
 def test_fleet_tier_legend_follows_pump_table_once(table):
     html = dashboard.fleet_page(table, {})
     legend = ('T0: existing signals only (legacy) · T1: low-cost retrofit '
-              '(suction pressure, wireless vibration) · T2: fully instrumented.')
+              '(suction pressure, wireless vibration and temperature) · T2: fully instrumented.')
     assert html.count(legend) == 1
     assert html.index('</table>') < html.index(legend) < html.index('Official composite:')
     assert html.split('</table>', 1)[1].startswith(f'\n<p>{legend}</p>')
