@@ -278,7 +278,8 @@ def test_run_detector_validation_pump08_and_until(monkeypatch):
     reference = run_detector(DATA, "validation", "causal_b1")
     full = run_detector(DATA, "validation")
     assert not reference.empty
-    identity = ["asset_id", "alert_time_utc", "confidence"]
+    identity = ["asset_id", "alert_time_utc"]
+    assert full.confidence.between(0, 1).all()
     assert len(full) == len(reference)
     assert_frame_equal(full[identity], reference[identity], check_exact=True)
     assert full.event_class.isin(EVENT_CLASSES).all() and full.fault_type.isin(FAULT_TYPES).all()

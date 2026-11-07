@@ -16,6 +16,7 @@ from matplotlib.patches import Patch
 import pandas as pd
 from retrofit_sim.baselines import CH
 
+from .confidence import TRAIN_LEVELS, evidence_level
 from .data import load_assets, load_features
 from .output import COLUMNS
 from .params import STOP_MODES
@@ -39,7 +40,6 @@ SIGNAL_LABELS = {
     "valve_position_pct": "Valve position (%)",
 }
 COLORS = {"MACHINE": "#b32d26", "SENSOR": "#d87800"}
-# Provisional confidence labels; replace in P3-2.
 CONFIDENCE_MEDIUM = 0.4
 CONFIDENCE_HIGH = 0.7
 
@@ -74,8 +74,13 @@ def _time(value):
 
 def _confidence(value):
     value = float(value)
+    name = evidence_level(value)
+    if name is not None:
+        level = TRAIN_LEVELS[name]
+        return (f'confidence {name} · alert {level.alert_reliability:.2f} (n={level.n})'
+                f' · type {level.type_reliability:.2f} (n={level.n})')
     label = 'low' if value < CONFIDENCE_MEDIUM else 'medium' if value < CONFIDENCE_HIGH else 'high'
-    return f'{value:.2f} {label} (provisional)'
+    return f'{value:.2f} {label}'
 
 
 def generate(asset, data, predictions, out, until=None):

@@ -3,6 +3,7 @@
 import pandas as pd
 from retrofit_sim.baselines import b1_threshold
 
+from .confidence import assign_confidence
 from .data import load_assets, load_features, load_snapshots
 from .detectors import causal_b1, score_features
 from .diagnosis import rediagnose
@@ -19,7 +20,7 @@ def candidate_stream(features, assets, snapshots=None) -> pd.DataFrame:
     diagnosed = rediagnose(candidates, scored, assets, snapshots)
     merged = merge_candidates(diagnosed, stuck_candidates(scored, assets, diagnosed),
                               cavitation_candidates(scored, assets, diagnosed))
-    return recommend(merged)
+    return assign_confidence(recommend(merged))
 
 
 def run_detector(data, split, detector="full", until=None, mask_tier=None) -> pd.DataFrame:

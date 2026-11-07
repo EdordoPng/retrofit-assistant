@@ -112,7 +112,7 @@ def test_summary_groups_and_signals(sample):
     assert invoke(sample) == 0
     html = (sample / 'out/A.html').read_text()
     for expected in ['Distinct conditions: 2', 'Repetitions: 1', 'C1:', 'C2:', 'Alert 1', 'Alert 3',
-                     '01 Jan 2026, 00:01 UTC', '01 Jan 2026, 00:02 UTC', '0.77 high (provisional)',
+                     '01 Jan 2026, 00:01 UTC', '01 Jan 2026, 00:02 UTC', '0.77 high',
                      'Fluid temperature (°C)', 'Gateway data', 'Keep &lt;action&gt;',
                      'full: fluid_temp_c z=2', 'Suggested action: Latest']:
         assert expected in html
