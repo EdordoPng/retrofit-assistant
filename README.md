@@ -1,12 +1,15 @@
 <p align="center">
-  <img src="docs/img/business_turku.png" alt="Business Turku" height="56">
+  <strong><a href="https://sinceai.app/events/since-ai-hackathon-2026">Since AI Hackathon 2026</a></strong>
+</p>
+<p align="center">
+  <a href="https://businessturku.fi/en/"><img src="docs/img/business_turku.png" alt="Business Turku" height="56"></a>
   &nbsp;&nbsp;&nbsp;
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/img/dodosolo_white.png">
     <img src="docs/img/dodosolo.png" alt="DodoSolo" height="56">
   </picture>
   &nbsp;&nbsp;&nbsp;
-  <img src="docs/img/since_ai.png" alt="Since AI" height="56">
+  <a href="https://sinceai.app/"><img src="docs/img/since_ai.png" alt="Since AI" height="56"></a>
 </p>
 
 # Retrofit Assistant
