@@ -42,9 +42,26 @@ def main(argv=None) -> int:
     compare.add_argument("--data", required=True)
     compare.add_argument("--out", required=True)
     compare.add_argument("--gate", action="store_true")
+    report_parser = commands.add_parser("report", help="Write a static operator report")
+    report_parser.add_argument("--asset", required=True)
+    report_parser.add_argument("--data", required=True)
+    report_parser.add_argument("--predictions", required=True)
+    report_parser.add_argument("--out", required=True)
     args = parser.parse_args(argv)
     if args.command is None:
         parser.print_help()
+        return 0
+    if args.command == "report":
+        from . import report
+        try:
+            destination = report.generate(args.asset, args.data, args.predictions, args.out)
+        except report.Refused as exc:
+            print(f"Report refused: {exc}", file=sys.stderr)
+            return 2
+        except Exception as exc:
+            print(f"Report failed: {type(exc).__name__}: {exc}", file=sys.stderr)
+            return 2
+        print(destination)
         return 0
     if args.command == "compare":
         try:
