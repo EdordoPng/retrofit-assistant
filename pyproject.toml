@@ -13,3 +13,7 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = '--strict-markers -m "not slow"'
+markers = [
+    "slow: complete causality truncation run, excluded by default",
+]
