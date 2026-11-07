@@ -47,6 +47,7 @@ def main(argv=None) -> int:
     report_parser.add_argument("--data", required=True)
     report_parser.add_argument("--predictions", required=True)
     report_parser.add_argument("--out", required=True)
+    report_parser.add_argument("--until")
     args = parser.parse_args(argv)
     if args.command is None:
         parser.print_help()
@@ -54,7 +55,7 @@ def main(argv=None) -> int:
     if args.command == "report":
         from . import report
         try:
-            destination = report.generate(args.asset, args.data, args.predictions, args.out)
+            destination = report.generate(args.asset, args.data, args.predictions, args.out, until=args.until)
         except report.Refused as exc:
             print(f"Report refused: {exc}", file=sys.stderr)
             return 2
