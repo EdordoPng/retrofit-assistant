@@ -1,6 +1,11 @@
 """Hand-calculated causal estimates and agreement with published B1 after day one."""
 
+import hashlib
+from importlib import metadata
+import os
 from pathlib import Path
+import subprocess
+import sys
 
 import numpy as np
 import pandas as pd
@@ -17,6 +22,14 @@ from retrofit_assistant.params import MIN_POOL_SAMPLES, Z_FLOORS
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "challenge" / "RETROFIT_AI_PARTICIPANTS_2026" / "data" / "full"
+# Scores: train 58.451, validation 78.013; commit 1fc6da3 (src/ unchanged
+# since fc3ce49). These values apply with requirements-lock.txt.
+FROZEN_SHA256 = {
+    "train": "c89da333816f1700d4bde4f6ad9e194772bfa6e8b54bb4ac206296793b00a079",
+    "validation": "26810c051cd4b2661072918aaee4cbc67b097fbebf77b0d4395e1bd897c23fe6",
+}
+# requirements-lock.txt does not specify the Python version.
+LOCK_PYTHON = (3, 14)
 MEAN = "vibration_rms_mm_s__mean"
 STD = "vibration_rms_mm_s__std"
 COUNT = "vibration_rms_mm_s__count"
@@ -24,6 +37,85 @@ PREDICTION_COLUMNS = [
     "asset_id", "alert_time_utc", "event_class", "fault_type", "confidence",
     "evidence", "recommended_action",
 ]
+
+
+def _lock_mismatch():
+    if sys.version_info[:2] != LOCK_PYTHON:
+        return f"Python {sys.version_info[:2]} does not match locked {LOCK_PYTHON}"
+    packages = {"pandas", "numpy", "pyarrow"}
+    locked = {}
+    for line in (ROOT / "requirements-lock.txt").read_text(encoding="utf-8").splitlines():
+        name, separator, version = line.partition("==")
+        if separator and name in packages:
+            locked[name] = version.strip()
+    for name in sorted(packages):
+        if name not in locked:
+            return f"{name} is missing from requirements-lock.txt"
+        try:
+            installed = metadata.version(name)
+        except metadata.PackageNotFoundError:
+            return f"{name} is not installed; lock requires {locked[name]}"
+        if installed != locked[name]:
+            return f"{name} {installed} does not match locked {locked[name]}"
+    return None
+
+
+def _assert_frozen(split, digest):
+    expected = FROZEN_SHA256[split]
+    if digest != expected:
+        pytest.fail(
+            f"causal_b1 is frozen: its output is the reference and may change only "
+            f"with an explicit decision by the user. Outside requirements-lock.txt, "
+            f"version differences may explain a mismatch. Split: {split}; "
+            f"obtained sha256: {digest}; expected: {expected}",
+            pytrace=False,
+        )
+
+
+@pytest.mark.parametrize("split", ["train", "validation"])
+def test_causal_b1_cli_output_is_frozen(tmp_path, split):
+    mismatch = _lock_mismatch()
+    if mismatch:
+        pytest.skip(mismatch)
+    output = tmp_path / "predictions.csv"
+    result = subprocess.run(
+        [sys.executable, "-m", "retrofit_assistant", "predict", "--data", str(DATA),
+         "--split", split, "--detector", "causal_b1", "--out", str(output)],
+        cwd=ROOT, env={**os.environ, "PYTHONHASHSEED": "1"},
+        capture_output=True, text=True, timeout=180,
+    )
+    if result.returncode != 0:
+        pytest.fail(f"causal_b1 CLI failed for {split} (exit {result.returncode}): {result.stderr}", pytrace=False)
+    _assert_frozen(split, hashlib.sha256(output.read_bytes()).hexdigest())
+
+
+@pytest.mark.parametrize("split", ["train", "validation"])
+def test_frozen_check_rejects_altered_digest(split):
+    digest = FROZEN_SHA256[split]
+    _assert_frozen(split, digest)
+    altered = digest[:-1] + ("0" if digest[-1] != "0" else "1")
+    with pytest.raises(pytest.fail.Exception, match="frozen.*decision by the user"):
+        _assert_frozen(split, altered)
+
+
+def test_frozen_environment_matches_lock():
+    if sys.version_info[:2] != LOCK_PYTHON:
+        pytest.skip("Python version differs from the lock environment")
+    mismatch = _lock_mismatch()
+    if mismatch:
+        pytest.fail(mismatch, pytrace=False)
+
+
+@pytest.mark.parametrize("component", ["package", "python"])
+def test_lock_mismatch_reports_difference(monkeypatch, component):
+    if component == "python":
+        monkeypatch.setattr(sys.modules[__name__], "LOCK_PYTHON", (0, 0))
+        assert "Python" in _lock_mismatch()
+    else:
+        monkeypatch.setattr(sys.modules[__name__], "LOCK_PYTHON", sys.version_info[:2])
+        original_version = metadata.version
+        monkeypatch.setattr(metadata, "version", lambda name: "different" if name == "numpy" else original_version(name))
+        assert "numpy" in _lock_mismatch()
 
 
 def minute_frame(values):
