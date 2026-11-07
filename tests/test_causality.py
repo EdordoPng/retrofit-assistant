@@ -122,6 +122,12 @@ def _cuts(asset, start, end, complete, fast):
             groups = {"sample": [alerts[0]] if alerts else groups["edge"]}
         # Every causal alert is covered, regardless of the asset name.
         groups["all_causal_alerts"] = [pd.Timestamp(t) for t in complete["causal_b1"].alert_time_utc]
+        candidates = complete.get("candidates")
+        if candidates is not None and "decided_by" in candidates:
+            sources = candidates.loc[candidates.decided_by.isin(("source_stuck", "source_cavitation"))]
+            groups["all_source_alerts"] = [pd.Timestamp(t) for t in sources.alert_time_utc]
+        # Also cut at scheduled emissions, including sources deferred by spacing.
+        groups["all_emissions"] = [pd.Timestamp(t) for t in complete["full"].alert_time_utc]
     return [(cut, cut in derived) for cut in sorted(set(sum(groups.values(), []))) if start <= cut < end]
 
 
@@ -157,14 +163,14 @@ def _check_assets(assets, run_factory, fast):
         asset = metadata.asset_id
         run = run_factory(asset)
         complete = {}
-        for detector in ("causal_b1", "full"):
+        for detector in ("causal_b1", "full", "candidates"):
             context["detector"] = detector
             frame, failed = _safe_run(run, detector, None)
             if failed:
                 record(asset, "full-run", False, detector, "exception")
             else:
                 complete[detector] = frame
-        if len(complete) != 2:
+        if len(complete) != 3:
             return
         context["detector"] = "both"
         cuts, failed = _safe_run(
@@ -177,7 +183,7 @@ def _check_assets(assets, run_factory, fast):
         for cut, derived in cuts:
             context.update(cut=cut.isoformat(), derived=derived)
             truncated = {}
-            for detector in ("causal_b1", "full"):
+            for detector in ("causal_b1", "full", "candidates"):
                 context["detector"] = detector
                 frame, failed = _safe_run(run, detector, cut)
                 if failed:
@@ -185,11 +191,13 @@ def _check_assets(assets, run_factory, fast):
                 else:
                     truncated[detector] = frame
             for detector, frame in truncated.items():
+                if detector == "candidates":
+                    continue
                 context["detector"] = detector
-                if "causal_b1" not in truncated:
+                if "candidates" not in truncated:
                     continue
                 difference, failed = _safe_run(
-                    _compare, complete[detector], frame, truncated["causal_b1"], cut, detector,
+                    _compare, complete[detector], frame, truncated["candidates"], cut, detector,
                 )
                 if failed or difference:
                     record(asset, context["cut"], derived, detector, "exception" if failed else difference)
@@ -225,15 +233,27 @@ def _real_check(monkeypatch, fast):
     if metadata is None:
         pytest.fail("Invalid RETROFIT_CAUSALITY_ASSETS", pytrace=False)
     real_loader = pipeline.load_assets
+    real_candidates = pipeline.candidate_stream
 
     def factory(asset):
+        captured = {}
+
         def only_asset(data, split=None):
             fresh = real_loader(data, split)
             return fresh.loc[fresh.asset_id == asset].copy().reset_index(drop=True)
 
         monkeypatch.setattr(pipeline, "load_assets", only_asset)
 
+        def capture_candidates(features, assets):
+            result = real_candidates(features, assets)
+            captured["candidates"] = result
+            return result
+
+        monkeypatch.setattr(pipeline, "candidate_stream", capture_candidates)
+
         def run(detector, until):
+            if detector == "candidates":
+                return captured["candidates"]
             return pipeline.run_detector(DATA, None, detector=detector, until=until)
 
         return run
@@ -324,6 +344,35 @@ def test_fast_plan_contains_every_causal_alert(asset):
     exhaustive = dict(_cuts(asset, start, end, complete, False))
     for time in pd.to_datetime(causal.alert_time_utc, utc=True):
         assert time in fast and fast[time]
+    assert set(fast) <= set(exhaustive)
+
+
+def test_source_deferred_by_official_spacing_matches_merged_stream():
+    start = pd.Timestamp("2026-01-01T00:00:00Z")
+    candidates = _rows(start, (0, 3)).assign(decided_by=["official", "source_stuck"])
+    candidates.loc[1, ["event_class", "fault_type"]] = ["SENSOR", "SENSOR_STUCK"]
+    minutes = pd.DataFrame(columns=["asset_id", "window_start_utc", "operating_mode"])
+    assets = pd.DataFrame({"asset_id": ["A"], "window_end_utc": [start + pd.Timedelta(days=1)]})
+    emitted = apply_guarantees(candidates, minutes, assets)
+    cut = start + pd.Timedelta(minutes=4)
+    assert _compare(emitted, emitted, candidates, cut, "full") is None
+    assert _compare(emitted, emitted, candidates.iloc[:1], cut, "full") == "spacing"
+    changed = emitted.copy()
+    changed.loc[1, "alert_time_utc"] = (pd.Timestamp(emitted.iloc[1].alert_time_utc) + pd.Timedelta(minutes=1)).isoformat()
+    assert _compare(emitted, changed, candidates, cut, "full") == "spacing"
+
+
+@pytest.mark.parametrize("source", ["source_stuck", "source_cavitation"])
+def test_fast_plan_cuts_every_source_candidate_and_scheduled_emission(source):
+    start = pd.Timestamp("2026-01-01T00:00:00Z")
+    causal = _rows(start, (10,))
+    candidates = _rows(start, (10, 13, 40)).assign(decided_by=["official", source, source])
+    full = _rows(start, (10, 16, 40))
+    complete = {"causal_b1": causal, "full": full, "candidates": candidates}
+    fast = dict(_cuts("ARBITRARY", start, start + pd.Timedelta(days=4), complete, True))
+    exhaustive = dict(_cuts("ARBITRARY", start, start + pd.Timedelta(days=4), complete, False))
+    for offset in (13, 16, 40):
+        assert fast[start + pd.Timedelta(minutes=offset)]
     assert set(fast) <= set(exhaustive)
 
 

@@ -71,7 +71,11 @@ def test_single_process_transmitter_drift_stays_sensor():
 
 def test_ambiguous_confirmed_shape_preserves_official_sensor_type():
     candidates, frame, assets = fixture("ambiguous")
-    assert_frame_equal(rediagnose(candidates, frame, assets), candidates)
+    original = candidates.copy(deep=True)
+    result = rediagnose(candidates, frame, assets)
+    assert_frame_equal(result[COLUMNS], original, check_exact=True)
+    assert result.decided_by.tolist() == ["rediagnose_confirmed"]
+    assert_frame_equal(candidates, original, check_exact=True)
 
 
 def test_shape_block_fits_b1_persistence():
@@ -96,8 +100,11 @@ def test_unverifiable_process_transmitter_keeps_official(missing):
         frame["z_i"] = np.nan
     elif missing == "stale":
         frame.loc[350:, CH["i"] + "__mean"] = np.nan
+    original = candidates.copy(deep=True)
     result = rediagnose(candidates, frame, assets)
-    assert_frame_equal(result, candidates)
+    assert_frame_equal(result[COLUMNS], original, check_exact=True)
+    assert result.decided_by.tolist() == ["official"]
+    assert_frame_equal(candidates, original, check_exact=True)
     assert result.attrs["diagnosis_states"][0]["state"] == "unverifiable"
 
 
@@ -111,17 +118,35 @@ def test_unverifiable_accelerometer_is_machine(key):
 @pytest.mark.parametrize("fault", ["COMMUNICATION_LOSS", "SENSOR_STUCK"])
 def test_protected_official_diagnoses(fault):
     candidates, frame, assets = fixture(fault=fault)
-    assert_frame_equal(rediagnose(candidates, frame, assets), candidates)
+    original = candidates.copy(deep=True)
+    result = rediagnose(candidates, frame, assets)
+    assert_frame_equal(result[COLUMNS], original, check_exact=True)
+    assert result.decided_by.tolist() == ["official_protected"]
+    assert_frame_equal(candidates, original, check_exact=True)
 
 
 def test_rows_order_times_and_confidence_unchanged():
     candidates, frame, assets = fixture()
     candidates = pd.concat([candidates, candidates.assign(confidence=0.42)], ignore_index=True)
     candidates.index = [9, 4]
+    original = candidates.copy(deep=True)
     result = rediagnose(candidates, frame, assets)
-    assert list(result.columns) == list(candidates.columns)
+    assert list(result.columns) == [*candidates.columns, "decided_by"]
+    expected = original.copy(deep=True)
+    expected["fault_type"] = "SENSOR_DRIFT"
+    expected["evidence"] = ("discharge_pressure_kpa=132.9; fresh coupled channels remain still; "
+                            "physical ramp +6/h over 5.33 h; concordant halves")
+    expected["recommended_action"] = "Verify discharge_pressure_kpa against an independent reference; review instrument history."
+    assert_frame_equal(result[COLUMNS], expected, check_exact=True)
+    assert result.decided_by.tolist() == ["rediagnose_confirmed", "rediagnose_confirmed"]
+    assert_frame_equal(candidates, original, check_exact=True)
     assert_frame_equal(result[["asset_id", "alert_time_utc", "confidence"]], candidates[["asset_id", "alert_time_utc", "confidence"]])
-    assert_frame_equal(rediagnose(candidates.iloc[:0], frame, assets), candidates.iloc[:0])
+    empty = candidates.iloc[:0].copy(deep=True)
+    empty_original = empty.copy(deep=True)
+    empty_result = rediagnose(empty, frame, assets)
+    assert_frame_equal(empty_result[COLUMNS], empty_original, check_exact=True)
+    assert empty_result.decided_by.tolist() == []
+    assert_frame_equal(empty, empty_original, check_exact=True)
 
 
 def test_availability_future_and_permutations():
@@ -203,10 +228,13 @@ def test_thermal_deviation_only_counts_after_model_settling(settled):
     candidates, frame, assets = fixture("step", key="wt", references=("i",), fault="SENSOR_DRIFT")
     frame["steady"] = False
     frame.loc[frame.index[-(params.THERMAL_SETTLE_MIN if settled else 15):], "steady"] = True
+    original = candidates.copy(deep=True)
     result = rediagnose(candidates, frame, assets)
     assert result.attrs["diagnosis_states"][0]["state"] == ("confirmed" if settled else "unverifiable")
     if not settled:
-        assert_frame_equal(result, candidates)
+        assert_frame_equal(result[COLUMNS], original, check_exact=True)
+        assert result.decided_by.tolist() == ["official"]
+        assert_frame_equal(candidates, original, check_exact=True)
 
 
 def test_recent_thermal_restart_leaves_crest_exception():
@@ -235,14 +263,21 @@ def test_single_minute_variance_spike_does_not_become_persistent_noise():
 @pytest.mark.parametrize("fault", ["COMMUNICATION_LOSS", "SENSOR_STUCK"])
 def test_protected_diagnoses_precede_noise_check(fault):
     candidates, frame, assets = fixture("noise", fault=fault)
-    assert_frame_equal(rediagnose(candidates, frame, assets), candidates)
+    original = candidates.copy(deep=True)
+    result = rediagnose(candidates, frame, assets)
+    assert_frame_equal(result[COLUMNS], original, check_exact=True)
+    assert result.decided_by.tolist() == ["official_protected"]
+    assert_frame_equal(candidates, original, check_exact=True)
 
 
 def test_float_quality_comm_loss_bit_is_not_a_valid_reference():
     candidates, frame, assets = fixture("step")
     frame["quality_any"] = 1.0
+    original = candidates.copy(deep=True)
     result = rediagnose(candidates, frame, assets)
-    assert_frame_equal(result, candidates)
+    assert_frame_equal(result[COLUMNS], original, check_exact=True)
+    assert result.decided_by.tolist() == ["official"]
+    assert_frame_equal(candidates, original, check_exact=True)
     assert result.attrs["diagnosis_states"][0]["state"] == "unverifiable"
 
 
@@ -312,3 +347,31 @@ def test_noise_ignores_actuator_variance_as_an_independent_witness():
     result = rediagnose(candidates, frame, assets)
     assert result.iloc[0].fault_type == "SENSOR_NOISE_SPIKES"
     assert result.attrs["diagnosis_states"][0]["state"] == "noise"
+
+
+@pytest.mark.parametrize("scenario,expected", [
+    ("confirmed", "rediagnose_confirmed"), ("noise", "rediagnose_noise"),
+    ("refuted", "rediagnose_refuted"), ("machine_refuted", "official"),
+    ("accelerometer", "rediagnose_accelerometer"), ("unverifiable", "official"),
+    ("protected", "official_protected"),
+])
+def test_decided_by_contract_without_input_mutation(scenario, expected):
+    if scenario == "accelerometer":
+        candidates, frame, assets = fixture(key="c", references=())
+    elif scenario == "unverifiable":
+        candidates, frame, assets = fixture(references=())
+    else:
+        candidates, frame, assets = fixture(
+            "noise" if scenario == "noise" else "step",
+            cls="MACHINE" if scenario == "machine_refuted" else "SENSOR",
+            fault="SENSOR_STUCK" if scenario == "protected" else "SENSOR_DRIFT",
+        )
+        if scenario in ("refuted", "machine_refuted"):
+            frame["z_i"] = 5.0
+    original = candidates.copy(deep=True)
+    result = rediagnose(candidates, frame, assets)
+    assert list(result.columns) == [*COLUMNS, "decided_by"]
+    assert result.decided_by.tolist() == [expected]
+    assert expected in params.DECIDED_BY
+    assert_frame_equal(candidates, original, check_exact=True)
+    assert "decided_by" not in result.attrs

@@ -11,6 +11,7 @@ from .params import ACCELEROMETER_CHANNELS, ACTUATOR_CHANNELS
 def rediagnose(candidates, scored, assets):
     """Preserve candidate identity/order and attach audit states outside the CSV."""
     result = candidates.copy()
+    result["decided_by"] = "official"
     states = []
     metadata = assets.set_index("asset_id")
     latency = AVAILABILITY["features_1min.parquet"].latency
@@ -31,19 +32,23 @@ def rediagnose(candidates, scored, assets):
                        "state": state, "accelerometer_exception": accelerometer,
                        "protected": protected})
         if protected:
+            result.loc[index, "decided_by"] = "official_protected"
             continue
         cls, fault = alert.event_class, alert.fault_type
         reason = ""
         if state == "noise":
+            result.loc[index, "decided_by"] = "rediagnose_noise"
             cls, fault = "SENSOR", "SENSOR_NOISE_SPIKES"
             reason = "persistent isolated variance; recent median mean deviation and fresh coupled variance deviations remain still"
         elif state == "confirmed":
+            result.loc[index, "decided_by"] = "rediagnose_confirmed"
             cls = "SENSOR"
             fault, reason = sensor_shape(history, key, metadata.loc[alert.asset_id], time)
             if fault == "UNKNOWN" and alert.event_class == "SENSOR":
                 fault = alert.fault_type
             reason = "fresh coupled channels remain still; " + reason
         elif (state == "refuted" or accelerometer) and cls == "SENSOR":
+            result.loc[index, "decided_by"] = "rediagnose_refuted" if state == "refuted" else "rediagnose_accelerometer"
             cls, fault = "MACHINE", "UNKNOWN"
             reason = "fresh coupled channel follows deviation" if state == "refuted" else "accelerometer-only deviation; no independent sensor evidence"
         if (cls, fault) != (alert.event_class, alert.fault_type):

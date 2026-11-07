@@ -26,6 +26,24 @@ FAULT_TYPES = (
     "SENSOR_NOISE_SPIKES", "COMMUNICATION_LOSS", "UNKNOWN",
 )
 
+DECIDED_BY = (
+    "official", "official_protected", "rediagnose_confirmed", "rediagnose_refuted",
+    "rediagnose_accelerometer", "rediagnose_noise", "source_stuck", "source_cavitation",
+)
+
+# sensors.py channel_specs: wireless bearing temperature has 0.5 C resolution
+# (dense: 0.1 C), wireless vibration resolutions are 0.01/0.001/0.01.
+# Offline normal train runs peak at 8 equal updates (35 min), bearing_temp_c.
+# Conservative hypotheses: twice that count, and >=15 min for dense channels.
+# Wireless duration also requires (STUCK_MIN_UPDATES - 1) real update intervals.
+STUCK_MIN_UPDATES = 16
+STUCK_MIN_MIN = 15
+# sensors.py channel_specs range clamps; dynamic nameplate bounds are in sources.
+STUCK_BOUNDS = {
+    "v": (0, 50), "a": (0, 16), "c": (1, 20), "bt": (-20, 150),
+    "ps": (-100, 600), "wt": (-20, 200), "tf": (-20, 120), "vp": (0, 100),
+}
+
 # Coupled-channel stillness: published diagnose uses k / 3.
 COUPLED_STILL_FRACTION = 1 / 3
 # In a closed loop these actuators react to the measurement, so they are not
