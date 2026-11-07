@@ -17,9 +17,11 @@ import pandas as pd
 from retrofit_sim.baselines import CH
 
 from .confidence import TRAIN_LEVELS, evidence_level
-from .data import load_assets, load_features
+from .data import AVAILABILITY, load_assets, load_features
+from .consistency import coupled_channels
+from .detectors import score_features
 from .output import COLUMNS
-from .params import STOP_MODES
+from .params import B1_K, COUPLED_STILL_FRACTION, STOP_MODES
 
 TIERS = {'T0_LEGACY': 'Legacy (T0)', 'T1_RETROFIT': 'Retrofit (T1)', 'T2_FULL': 'Full (T2)'}
 SIGNALS = ("vibration_rms_mm_s", "bearing_temp_c", "suction_pressure_kpa",
@@ -39,9 +41,38 @@ SIGNAL_LABELS = {
     "fluid_temp_c": "Fluid temperature (°C)",
     "valve_position_pct": "Valve position (%)",
 }
-COLORS = {"MACHINE": "#b32d26", "SENSOR": "#d87800"}
+COLORS = {"MACHINE": "#D55E00", "SENSOR": "#CC79A7"}
+# Okabe-Ito states: fill or line, text on white, dark theme. Always shown with a text label.
+STATES = {
+    "normal": ("#009E73", "#00775A", "#3CC79E"),
+    "attention": ("#E69F00", "#8A5A00", "#F2B33D"),
+    "sensor": ("#CC79A7", "#9C4A7A", "#E5A3C8"),
+    "machine": ("#D55E00", "#A84400", "#FF8A3D"),
+}
+BRAND = "#0033A0"
+CLASS_READING = {
+    "MACHINE": "The label reads this as a change in the machine rather than in one instrument",
+    "SENSOR": "The label reads this as an instrument fault rather than a change in the machine",
+}
+PATTERN_HOURS = 24
+VARIANCE_PATTERN_HOURS = 6  # variance alerts are short; a day hides them
+# Rules not decided by a z of the mean: (evidence marker, name). No new chart for these.
+OTHER_RULES = (("envelope peak", "spectrum"), ("after lockout", "spectrum"), ("NPSHa", "NPSH margin"),
+               ("unchanged across", "stuck value"), (" frozen", "stuck value"))
+PATTERN_INPUTS = {"window_start_utc", "operating_mode", "running_fraction"}
 CONFIDENCE_MEDIUM = 0.4
 CONFIDENCE_HIGH = 0.7
+
+
+CSS = (':root{--brand:%s;--bg:#FFFFFF;--ink:#243342;--border:#ccd4dc;--summary:#f1f5f8;%s} '
+       'body{font-family:Nunito,system-ui,sans-serif;font-weight:400;max-width:1100px;margin:2em auto;padding:0 1em;color:var(--ink);background:var(--bg)} '
+       'h1,h2,h3{font-weight:800;color:var(--brand)} img{max-width:100%%} '
+       '.alert,.condition,.summary,.operator,.pattern{border:1px solid var(--border);border-radius:6px;padding:0 1em;margin:1em 0} '
+       '.summary{background:var(--summary)} .operator{border-width:2px} '
+       '.state{display:inline-block;padding:.1em .6em;border-radius:1em;font-weight:600;border:2px solid} %s '
+       'table{border-collapse:collapse} td,th{border:1px solid var(--border);padding:.2em .5em}'
+       ) % (BRAND, ''.join(f'--{n}:{f};--{n}-text:{t};--{n}-dark:{d};' for n, (f, t, d) in STATES.items()),
+            ' '.join(f'.state.{n}{{border-color:var(--{n if n != "attention" else n + "-text"});color:var(--{n}-text)}}' for n in STATES))
 
 
 class Refused(ValueError):
@@ -81,6 +112,128 @@ def _confidence(value):
                 f' · type {level.type_reliability:.2f} (n={level.n})')
     label = 'low' if value < CONFIDENCE_MEDIUM else 'medium' if value < CONFIDENCE_HIGH else 'high'
     return f'{value:.2f} {label}'
+
+
+def _state(alert):
+    if alert is None:
+        return "normal"
+    if alert.fault_type == "UNKNOWN":
+        return "attention"
+    state = str(alert.event_class).lower()
+    return state if state in ("machine", "sensor") else "attention"
+
+
+def pattern_channels(evidence, installed, limit=3):
+    """The deviating channel, then its installed COUPLED witnesses, at most `limit`."""
+    name = _channel(evidence)
+    if name is None:
+        return []
+    keys = {channel: key for key, channel in CH.items()}
+    key = keys[name]
+    return [(key, CH[key]) for key in (key, *coupled_channels(key, installed))][:limit]
+
+
+def shown_value(value, limit):
+    """Signed value with enough decimals that its rounding never crosses or equals the limit."""
+    for digits in (1, 2, 3):
+        shown = round(abs(value), digits)
+        if shown != limit and (shown > limit) == (abs(value) > limit):
+            break
+    return f"{value:+.{digits}f}"
+
+
+def pattern_rule(evidence):
+    """'mean', 'variance', or the name of a rule that is not decided by a z-score."""
+    evidence = str(evidence)
+    for marker, name in OTHER_RULES:
+        if marker in evidence:
+            return name
+    return "variance" if "isolated variance" in evidence else "mean"
+
+
+def pattern_panel(alert, features, metadata):
+    """One panel: the detector's z (mean) or zs (variance) of the deviating channel and its
+    witnesses, from minutes available at the alert only, plus one sentence."""
+    esc = lambda value: escape(str(value), quote=True)
+    installed = set(str(metadata.get("channels_available", "")).split("|"))
+    channels = pattern_channels(alert.evidence, installed)
+    rule = pattern_rule(alert.evidence)
+    labels = [SIGNAL_LABELS.get(name, name) for _, name in channels]
+    reading = CLASS_READING.get(alert.event_class, "See the evidence below")
+    if rule not in ("mean", "variance"):
+        witnesses = ", ".join(labels[1:]) or "none installed"
+        return (f'<section class="pattern"><h2>Pattern</h2><p>{esc(f"Decided by {rule}, not by the z of the mean. Deviating signal: {labels[0] if labels else deviating_signal(alert.evidence)}; witnesses: {witnesses}. {reading}.")}</p>'
+                f'<p><small>Evidence: {esc(alert.evidence)}</small></p></section>')
+    fallback = ('<section class="pattern"><h2>Pattern</h2><p>No z-score pattern for this alert. '
+                f'Evidence: {esc(alert.evidence)}</p></section>')
+    time = alert['_time']
+    latency = AVAILABILITY["features_1min.parquet"].latency
+    available = features.loc[features.window_start_utc + latency <= time]
+    if not channels or available.empty or not PATTERN_INPUTS <= set(available.columns):
+        return fallback
+    prefix = "zs_" if rule == "variance" else "z_"
+    scored = score_features(available, metadata.to_frame().T.infer_objects())
+    hours = VARIANCE_PATTERN_HOURS if rule == "variance" else PATTERN_HOURS
+    window = scored.loc[scored.window_start_utc >= time - pd.Timedelta(hours=hours)].copy()
+    stopped = window.operating_mode.isin(STOP_MODES)
+    deviating = channels[0]
+    channels = [(key, name) for key, name in channels if prefix + key in window and window[prefix + key].notna().any()]
+    if deviating not in channels:
+        return fallback
+    for key, _ in channels:
+        window.loc[stopped, prefix + key] = float("nan")
+    limits = {key: B1_K if i == 0 or rule == "mean" else B1_K * COUPLED_STILL_FRACTION
+              for i, (key, _) in enumerate(channels)}
+    symbol = "zs" if rule == "variance" else "z"
+    figure, ax = plt.subplots(figsize=(11, 3))
+    for (key, name), style in zip(channels, ("-", "--", ":")):
+        role = "deviating" if key == channels[0][0] else "witness"
+        ax.plot(window.window_start_utc, window[prefix + key], linestyle=style, color="#243342",
+                linewidth=1.2, label=f"{SIGNAL_LABELS.get(name, name)} ({role})")
+    for level in sorted(set(limits.values())):
+        for sign in (1, -1):
+            ax.axhline(sign * level, color="#888888", linewidth=.8, linestyle="-.")
+    times = window.loc[stopped, "window_start_utc"]
+    for _, group in times.groupby(times.diff().ne(pd.Timedelta(minutes=1)).cumsum()):
+        ax.axvspan(group.iloc[0], group.iloc[-1] + pd.Timedelta(minutes=1), color="#888888", alpha=.16)
+    ax.axvline(time, color=COLORS.get(alert.event_class, "#777777"), linewidth=1.5)
+    running = window.loc[~stopped]
+    at_alert = [running[prefix + key].dropna().iloc[-1] for key, _ in channels if running[prefix + key].notna().any()]
+    # Transients at stops and restarts would flatten the alert; values beyond the limit are clipped.
+    limit = max([2 * B1_K] + [1.5 * abs(v) for v in at_alert])
+    ax.set_ylim(-limit, limit)
+    thresholds = f"±{B1_K:g}" if rule == "mean" else f"±{B1_K:g} deviating, ±{B1_K * COUPLED_STILL_FRACTION:g} witnesses"
+    ax.set_ylabel(f"{symbol} ({thresholds})")
+    ax.legend(loc="upper left", fontsize=9)
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%d %b %H:%M", tz=timezone.utc))
+    figure.tight_layout()
+    buffer = BytesIO()
+    figure.savefig(buffer, format="png", dpi=90)
+    plt.close(figure)
+    image = base64.b64encode(buffer.getvalue()).decode("ascii")
+    def z_text(key, name):
+        values = running[prefix + key].dropna()
+        if values.empty:
+            return f"{SIGNAL_LABELS.get(name, name)} has no score"
+        value = values.iloc[-1]
+        beyond = abs(value) > limits[key]
+        return (f"{SIGNAL_LABELS.get(name, name)} {symbol}={shown_value(value, limits[key])} "
+                f"({'beyond' if beyond else 'within'} ±{limits[key]:g})")
+    (key, name), witnesses = channels[0], channels[1:]
+    measure = "variance" if rule == "variance" else "mean"
+    sentence = f"At {_time(time)}, {measure}: {z_text(key, name)}"
+    sentence += ("; witnesses: " + ", ".join(z_text(*w) for w in witnesses)) if witnesses else "; no installed witness"
+    still = B1_K * COUPLED_STILL_FRACTION
+    if alert.event_class == "MACHINE" and witnesses and all(
+            not running[prefix + w].dropna().empty and abs(running[prefix + w].dropna().iloc[-1]) <= still
+            for w, _ in witnesses):
+        reading = (f"Witnesses stay within ±{still:g}, so they do not explain this label; "
+                   "it comes from another rule (see evidence)")
+    sentence += f". {reading}."
+    return (f'<section class="pattern"><h2>Pattern</h2><p>{esc(sentence)}</p>'
+            f'<img alt="Detector {symbol} of the deviating channel and its witnesses up to the alert" src="data:image/png;base64,{image}">'
+            f'<p><small>Last {hours} h up to the alert; only minutes available at the alert time; axis clipped at ±{limit:.0f}; '
+            f'stopped minutes shaded and not scored. Evidence: {esc(alert.evidence)}</small></p></section>')
 
 
 def generate(asset, data, predictions, out, until=None):
@@ -217,9 +370,22 @@ def generate(asset, data, predictions, out, until=None):
         latest = _condition_title(last_alert)
         action = last_alert.recommended_action
     horizon = until if until is not None else metadata['window_end_utc']
+    last_alert = None if alerts.empty else alerts.iloc[-1]
+    status = _state(last_alert)
+    if last_alert is None:
+        operator = ('<section class="operator"><p><span class="state normal">normal</span></p>'
+                    '<p><strong>Action:</strong> no action; no alerts up to the last data.</p></section>')
+        pattern = ''
+    else:
+        operator = (f'<section class="operator"><p><span class="state {status}">{status}</span></p>'
+                    f'<p><strong>Action:</strong> {esc(last_alert.recommended_action)}</p>'
+                    f'<p><strong>Reason:</strong> {esc(_condition_title(last_alert))}; deviating signal: {esc(deviating_signal(last_alert.evidence))}</p>'
+                    f'<p><strong>Confidence:</strong> {esc(_confidence(last_alert.confidence))}</p>'
+                    f'<p><small>Advisory only: human review required. Alert time: {esc(_time(last_alert["_time"]))}</small></p></section>')
+        pattern = pattern_panel(last_alert, features, metadata)
     page = f'''<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Report {esc(asset)}</title>
-<style>body{{font-family:sans-serif;max-width:1100px;margin:2em auto;padding:0 1em;color:#243342}} img{{max-width:100%}} .alert,.condition,.summary{{border:1px solid #ccd4dc;border-radius:6px;padding:0 1em;margin:1em 0}} .summary{{background:#f1f5f8}}</style></head><body>
-<h1>Report: {esc(asset)}</h1><p>Instrumentation: {esc(TIERS.get(metadata['instrumentation_tier'], metadata['instrumentation_tier']))}</p><p><small>Split: {esc(metadata['split'])}</small></p>
+<style>{CSS}</style></head><body>
+<h1>Report: {esc(asset)}</h1>{operator}{pattern}<h2>Detail</h2><p>Instrumentation: {esc(TIERS.get(metadata['instrumentation_tier'], metadata['instrumentation_tier']))}</p><p><small>Split: {esc(metadata['split'])}</small></p>
 <p>UTC window: {esc(_time(metadata['window_start_utc']))} — {esc(_time(horizon))} | Alerts: {len(alerts)}</p>
 <section class="summary"><h2>Summary</h2><p><strong>Advisory only: human review required</strong></p>
 <p>Data up to {esc(_time(horizon))}</p><p>Last data: {esc(state)}</p><p>Distinct conditions: {len(conditions)}</p>

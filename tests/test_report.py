@@ -40,7 +40,8 @@ def test_html_and_filtering(sample):
     assert '<script' not in html.lower() and 'http://' not in html and 'https://' not in html
     assert '&lt;script&gt;alert(1)&lt;/script&gt;' in html
     assert 'other asset secret' not in html
-    assert html.index('first evidence') < html.index('&lt;script&gt;')
+    alerts = html[html.index('<h2>Alerts</h2>'):]
+    assert alerts.index('first evidence') < alerts.index('&lt;script&gt;')
     for value in ['MACHINE', 'SENSOR', 'UNKNOWN', '0.7', 'Review', 'Inspect', '2026-01-01T00:02:00Z']:
         assert value in html
     assert html.count('<article class="alert">') == 2
@@ -369,3 +370,274 @@ def test_history_and_previous_diagnosis_are_html_escaped(history_report):
     assert '<class>' not in html
     assert 'Diagnosis changed from:</strong> &lt;class&gt;/&quot;type&quot;&amp;' in cards[1]
     assert '01 Jan 2026, 00:01 UTC &lt;class&gt;/&quot;type&quot;&amp; (low)' in cards[1]
+
+
+@pytest.fixture
+def pattern_sample():
+    """Enough completed minutes for the real causal estimator to warm up."""
+    import numpy as np
+    from retrofit_sim.baselines import CH
+
+    start = pd.Timestamp('2026-01-01T00:00:00Z')
+    time = start + pd.Timedelta(minutes=120, seconds=30)
+    metadata = pd.Series(dict(asset_id='A', split='train', instrumentation_tier='T2_FULL',
+                              motor_rated_rpm=1500., window_start_utc=start,
+                              window_end_utc=start + pd.Timedelta(minutes=180),
+                              channels_available='|'.join(CH[k] for k in ('q', 'pd', 'i', 'pw', 'n', 'vp'))))
+    frame = pd.DataFrame(dict(asset_id=['A'] * 180,
+                              window_start_utc=pd.date_range(start, periods=180, freq='min'),
+                              rows=60., operating_mode='RUNNING', running_fraction=1.))
+    for key, base in [('q', 100.), ('pd', 200.), ('i', 20.)]:
+        frame[CH[key] + '__mean'] = base + .1 * np.sin(np.arange(180))
+        frame[CH[key] + '__std'] = .1 + .002 * np.sin(np.arange(180))
+        frame[CH[key] + '__count'] = 60.
+    frame.loc[110:119, 'flow_m3_h__mean'] = 140.
+    frame.loc[110:119, 'flow_m3_h__std'] = 2.
+    alert = pd.Series(dict(asset_id='A', _time=time, alert_time_utc=time.isoformat(),
+                           event_class='SENSOR', fault_type='SENSOR_NOISE', confidence=.5,
+                           evidence='full: flow_m3_h isolated variance', recommended_action='Review'))
+    return frame, metadata, alert
+
+
+@pytest.mark.parametrize('rule,prefix,hours', [('mean', 'z_', 24), ('variance', 'zs_', 6)])
+def test_pattern_uses_detector_scores_and_is_causal(pattern_sample, monkeypatch, rule, prefix, hours):
+    from matplotlib.axes import Axes
+    from pandas.testing import assert_series_equal
+
+    frame, metadata, alert = pattern_sample
+    alert.evidence = 'flow_m3_h isolated variance' if rule == 'variance' else 'flow_m3_h deviation'
+    frame.loc[115:116, 'operating_mode'] = ['STOPPED', 'LOCKED_OUT']
+    available = frame.loc[frame.window_start_utc + pd.Timedelta(minutes=1) <= alert['_time']]
+    expected = report.score_features(available, metadata.to_frame().T.infer_objects())
+    expected.loc[expected.operating_mode.isin(report.STOP_MODES), [prefix + key for key in ('q', 'pd', 'i')]] = float('nan')
+    scored_inputs, plotted, limits, spans, axes_limits = [], [], [], [], []
+    real_score, real_plot = report.score_features, Axes.plot
+    real_hline, real_span, real_ylim = Axes.axhline, Axes.axvspan, Axes.set_ylim
+
+    def score(features, assets):
+        scored_inputs.append(features.copy())
+        return real_score(features, assets)
+
+    def plot(ax, x, y, *args, **kwargs):
+        plotted.append((x.copy(), y.copy(), kwargs['label']))
+        return real_plot(ax, x, y, *args, **kwargs)
+
+    def hline(ax, y, *args, **kwargs):
+        limits.append(y)
+        return real_hline(ax, y, *args, **kwargs)
+
+    def span(ax, x1, x2, *args, **kwargs):
+        spans.append((x1, x2, kwargs['color']))
+        return real_span(ax, x1, x2, *args, **kwargs)
+
+    def ylim(ax, *args, **kwargs):
+        if len(args) == 2:
+            axes_limits.append(args)
+        return real_ylim(ax, *args, **kwargs)
+
+    monkeypatch.setattr(report, 'score_features', score)
+    monkeypatch.setattr(Axes, 'plot', plot)
+    monkeypatch.setattr(Axes, 'axhline', hline)
+    monkeypatch.setattr(Axes, 'axvspan', span)
+    monkeypatch.setattr(Axes, 'set_ylim', ylim)
+    original = report.pattern_panel(alert, frame, metadata)
+    assert len(plotted) == 3
+    assert len(scored_inputs[0]) == 120
+    assert scored_inputs[0].window_start_utc.max() == metadata.window_start_utc + pd.Timedelta(minutes=119)
+    for (x, y, label), key in zip(plotted, ('q', 'pd', 'i')):
+        assert_series_equal(x, expected.window_start_utc)
+        assert_series_equal(y, expected[prefix + key])
+        assert y.iloc[115:117].isna().all()
+        assert ('deviating' if key == 'q' else 'witness') in label
+    expected_limit = max(2 * report.B1_K, *(1.5 * abs(expected[prefix + key].dropna().iloc[-1]) for key in ('q', 'pd', 'i')))
+    assert axes_limits[-1] == (-expected_limit, expected_limit)
+    assert {6., -6.} <= set(limits)
+    if rule == 'variance':
+        assert {2., -2.} <= set(limits)
+        assert 'variance: Flow (m³/h) zs=' in original
+        assert 'within ±2' in original
+    else:
+        assert set(limits) == {6., -6.}
+        assert 'mean: Flow (m³/h) z=' in original
+    assert f'Last {hours} h up to the alert' in original
+    assert (metadata.window_start_utc + pd.Timedelta(minutes=115),
+            metadata.window_start_utc + pd.Timedelta(minutes=117), '#888888') in spans
+    # Also mutate a minute already started at the alert but not yet complete.
+    changed = frame.copy()
+    future = changed.window_start_utc + pd.Timedelta(minutes=1) > alert['_time']
+    for column in [c for c in changed if c.endswith(('__mean', '__std'))]:
+        changed.loc[future, column] = 1e12
+    changed.loc[future, 'operating_mode'] = 'LOCKED_OUT'
+    assert report.pattern_panel(alert, changed, metadata) == original
+    assert report.pattern_panel(alert, available, metadata) == original
+
+
+@pytest.mark.parametrize('evidence,rule', [
+    ('vibration_rms_mm_s envelope peak', 'spectrum'),
+    ('vibration_rms_mm_s after lockout', 'spectrum'),
+    ('suction_pressure_kpa NPSHa below margin', 'NPSH margin'),
+    ('flow_m3_h unchanged across observations', 'stuck value'),
+    ('flow_m3_h frozen', 'stuck value'),
+])
+def test_non_z_pattern_explains_rule_and_shows_only_text(pattern_sample, monkeypatch, evidence, rule):
+    frame, metadata, alert = pattern_sample
+    alert.evidence = evidence
+
+    def forbidden(*args, **kwargs):
+        pytest.fail('Non-z rules must not compute a new plot')
+
+    monkeypatch.setattr(report, 'score_features', forbidden)
+    html = report.pattern_panel(alert, frame, metadata)
+    assert f'Decided by {rule}, not by the z of the mean' in html
+    assert 'witnesses:' in html and f'Evidence: {evidence}' in html
+    assert '<img' not in html
+
+
+@pytest.mark.parametrize('missing', ['operating_mode', 'running_fraction', 'channel', 'completed'])
+def test_pattern_missing_inputs_fall_back(pattern_sample, monkeypatch, missing):
+    frame, metadata, alert = pattern_sample
+    if missing == 'channel':
+        alert.evidence = 'missing rows <unknown>'
+    elif missing == 'completed':
+        alert['_time'] = metadata.window_start_utc
+    else:
+        frame = frame.drop(columns=missing)
+
+    def forbidden(*args, **kwargs):
+        pytest.fail('Missing inputs must use the fallback')
+
+    monkeypatch.setattr(report, 'score_features', forbidden)
+    html = report.pattern_panel(alert, frame, metadata)
+    assert 'No z-score pattern for this alert.' in html and '<img' not in html
+    if missing == 'channel':
+        assert '&lt;unknown&gt;' in html
+
+
+def test_pattern_selects_deviating_then_installed_coupled_witnesses():
+    from retrofit_sim.baselines import CH
+
+    assert report.pattern_channels('flow_m3_h; discharge_pressure_kpa', set(CH.values())) == [
+        ('q', CH['q']), ('pd', CH['pd']), ('i', CH['i'])]
+    assert report.pattern_channels('flow_m3_h', {CH['q'], CH['pw'], CH['n'], CH['vp']}) == [
+        ('q', CH['q']), ('pw', CH['pw'])]
+    assert report.pattern_channels('no channel', set(CH.values())) == []
+
+
+def fixed_pattern_scores(monkeypatch, frame, values, prefix):
+    """Prescribe only detector outputs to exercise presentation at exact thresholds."""
+    scored = frame.copy()
+    for key, value in values.items():
+        scored[prefix + key] = value
+    monkeypatch.setattr(report, 'score_features', lambda features, assets: scored)
+
+
+@pytest.mark.parametrize('rule,prefix,symbol', [('mean', 'z_', 'z'), ('variance', 'zs_', 'zs')])
+@pytest.mark.parametrize('value,display,judgment', [
+    (5.96, '+5.96', 'within'), (-5.96, '-5.96', 'within'),
+    (5.996, '+5.996', 'within'), (6.04, '+6.04', 'beyond'), (-6.04, '-6.04', 'beyond'),
+])
+def test_pattern_rounding_agrees_with_shown_value(pattern_sample, monkeypatch, rule, prefix, symbol, value, display, judgment):
+    frame, metadata, alert = pattern_sample
+    alert.evidence = 'flow_m3_h isolated variance' if rule == 'variance' else 'flow_m3_h deviation'
+    fixed_pattern_scores(monkeypatch, frame.iloc[:120], dict(q=value, pd=0., i=0.), prefix)
+    html = report.pattern_panel(alert, frame, metadata)
+    assert f'{symbol}={display} ({judgment} ±6)' in html
+    assert f'{symbol}=+6.0 ' not in html and f'{symbol}=-6.0 ' not in html
+
+
+@pytest.mark.parametrize('rule,prefix', [('mean', 'z_'), ('variance', 'zs_')])
+@pytest.mark.parametrize('witness,still', [(0., True), (2., True), (-2., True), (2.01, False)])
+def test_machine_reading_with_still_witnesses(pattern_sample, monkeypatch, rule, prefix, witness, still):
+    frame, metadata, alert = pattern_sample
+    alert.event_class = 'MACHINE'
+    alert.evidence = 'flow_m3_h isolated variance' if rule == 'variance' else 'flow_m3_h deviation'
+    fixed_pattern_scores(monkeypatch, frame.iloc[:120], dict(q=8., pd=witness, i=0.), prefix)
+    html = report.pattern_panel(alert, frame, metadata)
+    required = ('Witnesses stay within ±2, so they do not explain this label; '
+                'it comes from another rule (see evidence).')
+    assert (required in html) == still
+    assert (report.CLASS_READING['MACHINE'] in html) != still
+
+
+@pytest.mark.parametrize('rule,prefix', [('mean', 'z_'), ('variance', 'zs_')])
+def test_stopped_scores_do_not_enter_pattern_sentence(pattern_sample, monkeypatch, rule, prefix):
+    frame, metadata, alert = pattern_sample
+    alert.evidence = 'flow_m3_h isolated variance' if rule == 'variance' else 'flow_m3_h deviation'
+    scored = frame.iloc[:120].copy()
+    scored.loc[118:119, 'operating_mode'] = ['STOPPED', 'LOCKED_OUT']
+    for key, value in dict(q=8., pd=0., i=0.).items():
+        scored[prefix + key] = value
+        scored.loc[118:119, prefix + key] = 12345.
+    monkeypatch.setattr(report, 'score_features', lambda *args: scored)
+    html = report.pattern_panel(alert, frame, metadata)
+    assert '=+8.0 (beyond ±6)' in html
+    assert '12345' not in html.split('<img')[0]
+    assert 'stopped minutes shaded and not scored' in html
+
+
+def test_missing_candidate_score_does_not_promote_witness(pattern_sample, monkeypatch):
+    frame, metadata, alert = pattern_sample
+    fixed_pattern_scores(monkeypatch, frame.iloc[:120], dict(q=float('nan'), pd=8., i=0.), 'zs_')
+    html = report.pattern_panel(alert, frame, metadata)
+    assert 'No z-score pattern for this alert.' in html
+    assert '<img' not in html
+
+
+@pytest.mark.parametrize('until,minute', [(None, 150), ('2026-01-01T02:01:00Z', 120)])
+def test_operator_order_and_pattern_use_last_visible_alert(pattern_sample, tmp_path, monkeypatch, until, minute):
+    frame, metadata, alert = pattern_sample
+    metadata.to_frame().T.to_csv(tmp_path / 'assets.csv', index=False)
+    frame.to_parquet(tmp_path / 'features_1min.parquet', index=False)
+    rows = []
+    for m in (150, 120):
+        row = {column: alert[column] for column in COLUMNS}
+        row['alert_time_utc'] = (metadata.window_start_utc + pd.Timedelta(minutes=m)).isoformat()
+        rows.append(row)
+    pd.DataFrame(rows).to_csv(tmp_path / 'predictions.csv', index=False)
+    received = []
+    real_panel = report.pattern_panel
+
+    def panel(selected, features, asset):
+        received.append(selected['_time'])
+        return real_panel(selected, features, asset)
+
+    monkeypatch.setattr(report, 'pattern_panel', panel)
+    html = report.generate('A', tmp_path, tmp_path / 'predictions.csv', tmp_path / 'out', until=until).read_text()
+    assert received == [metadata.window_start_utc + pd.Timedelta(minutes=minute)]
+    assert html.index('<section class="operator">') < html.index('<h2>Pattern</h2>') < html.index('<h2>Detail</h2>')
+    assert '<span class="state sensor">sensor</span>' in html
+    for label in ('Action:', 'Reason:', 'Confidence:'):
+        assert label in html[:html.index('<h2>Pattern</h2>')]
+    assert not any(value in html.lower() for value in ('http://', 'https://', '<script'))
+
+
+@pytest.mark.parametrize('event_class,fault_type,state', [
+    ('MACHINE', 'OTHER', 'machine'), ('SENSOR', 'OTHER', 'sensor'),
+    ('MACHINE', 'UNKNOWN', 'attention'), ('<script>', 'OTHER', 'attention'),
+])
+def test_operator_has_textual_safe_state(sample, event_class, fault_type, state):
+    rows = [['A', '2026-01-01T00:01:00Z', event_class, fault_type, .5, 'no channel', 'Review']]
+    pd.DataFrame(rows, columns=COLUMNS).to_csv(sample / 'predictions.csv', index=False)
+    html = report.generate('A', sample, sample / 'predictions.csv', sample / 'out').read_text()
+    assert f'<span class="state {state}">{state}</span>' in html
+    assert '<script' not in html
+
+
+def test_operator_without_alerts_is_normal(sample):
+    pd.DataFrame(columns=COLUMNS).to_csv(sample / 'predictions.csv', index=False)
+    html = report.generate('A', sample, sample / 'predictions.csv', sample / 'out').read_text()
+    assert '<span class="state normal">normal</span>' in html
+
+
+@pytest.mark.parametrize('asset', ['PUMP-10', 'PUMP-11', 'PUMP-12'])
+def test_generate_refuses_test_asset_before_predictions_or_features(asset, monkeypatch):
+    metadata = pd.DataFrame([dict(asset_id=asset, split='test')])
+    monkeypatch.setattr(report, 'load_assets', lambda data: metadata)
+
+    def forbidden(*args, **kwargs):
+        pytest.fail('Refused asset must not read predictions or features')
+
+    monkeypatch.setattr(report.pd, 'read_csv', forbidden)
+    monkeypatch.setattr(report, 'load_features', forbidden)
+    with pytest.raises(report.Refused, match='not a train or validation asset'):
+        report.generate(asset, 'missing', 'missing.csv', 'build/refused')
