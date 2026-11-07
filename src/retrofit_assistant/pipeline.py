@@ -8,16 +8,18 @@ from .detectors import causal_b1, score_features
 from .diagnosis import rediagnose
 from .params import B1_K, B1_PERSIST
 from .policy import apply_guarantees
+from .recommendations import recommend
 from .sources import cavitation_candidates, merge_candidates, stuck_candidates
 
 
 def candidate_stream(features, assets) -> pd.DataFrame:
-    """Merged, diagnosed candidates with explicit provenance, before guarantees."""
+    """Merged, diagnosed and guided candidates with explicit provenance, before guarantees."""
     scored = score_features(features, assets)
     candidates = b1_threshold(scored, k=B1_K, persist=B1_PERSIST)
     diagnosed = rediagnose(candidates, scored, assets)
-    return merge_candidates(diagnosed, stuck_candidates(scored, assets, diagnosed),
-                            cavitation_candidates(scored, assets, diagnosed))
+    merged = merge_candidates(diagnosed, stuck_candidates(scored, assets, diagnosed),
+                              cavitation_candidates(scored, assets, diagnosed))
+    return recommend(merged)
 
 
 def run_detector(data, split, detector="full", until=None) -> pd.DataFrame:

@@ -61,7 +61,10 @@ def steady_minutes(history):
 
 
 def coupled_channels(key, installed):
-    """Independent witnesses; an actuator's own deviation uses normal coupling."""
+    """Installed COUPLED channels, never the actuators n and vp as witnesses.
+
+    n and vp have no COUPLED entry, so a deviating actuator has no witnesses.
+    """
     return tuple(c for c in COUPLED.get(key, ()) if CH[c] in installed
                  and (key in ACTUATOR_CHANNELS or c not in ACTUATOR_CHANNELS))
 

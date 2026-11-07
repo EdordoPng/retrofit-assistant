@@ -282,3 +282,21 @@ def test_run_detector_validation_pump08_and_until(monkeypatch):
     assert run_detector(DATA, "validation", until=cutoff).empty
     with pytest.raises(ValueError):
         run_detector("missing-data", "validation", detector="invalid")
+
+
+TEMPLATE = ROOT / "challenge" / "RETROFIT_AI_PARTICIPANTS_2026" / "submission_template" / "predictions_template.csv"
+
+
+def test_csv_columns_equal_template_and_drop_decided_by(tmp_path):
+    template = TEMPLATE.read_text(encoding="utf-8").splitlines()[0].split(",")
+    assert COLUMNS == template
+    frame = pd.DataFrame([VALID], columns=COLUMNS).assign(decided_by="official")
+    path = tmp_path / "with_provenance.csv"
+    write_predictions(frame, path)
+    assert path.read_text(encoding="utf-8").splitlines()[0].split(",") == template
+    assert list(run_detector(DATA, "validation").columns) == template
+
+
+def test_decided_by_vocabulary_matches_guidance():
+    from retrofit_assistant import params, recommendations
+    assert recommendations.DECIDED_BY == params.DECIDED_BY

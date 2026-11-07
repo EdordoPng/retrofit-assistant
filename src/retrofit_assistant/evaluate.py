@@ -11,6 +11,8 @@ from .pipeline import run_detector
 SPLITS = ("train", "validation")
 DETECTORS = ("full", "causal_b1")
 DECLARED_B1 = {"train": 58.2, "validation": 78.0}
+# Median lead to deadline (h), baselines/results/baseline_metrics.md, B1_mode_aware_z.
+DECLARED_B1_LEAD = {"train": 55.8, "validation": 8.3}
 
 
 def evaluate_split(data, split, detector):
@@ -32,6 +34,10 @@ def alert_burden(result):
     return (result["composite_score"] / 100 - other) / WEIGHTS["alert_burden"]
 
 
+def _optional(value, digits):
+    return "-" if value is None or pd.isna(value) else f"{value:.{digits}f}"
+
+
 def gate(full_scores, reference_scores):
     return (all(full_scores[s] >= reference_scores[s] for s in SPLITS)
             and any(full_scores[s] > reference_scores[s] for s in SPLITS))
@@ -41,7 +47,8 @@ def markdown_table(results):
     columns = ("detector", "split", "composite", "event_f1", "event_recall", "alert_precision",
                "timeliness", "fault_type_recall", "class_recall", "alert_burden",
                "false_alerts_per_asset_day", "eventi rilevati/totali", "false_alert_episodes",
-               "excess_repeat_episodes", "tipo corretto", "classe corretta")
+               "excess_repeat_episodes", "tipo corretto", "classe corretta",
+               "median_lead_time_h", "early_warning_rate")
     rows = ["| " + " | ".join(columns) + " |", "| " + " | ".join(["---"] * len(columns)) + " |"]
     for detector in DETECTORS:
         for split in SPLITS:
@@ -54,11 +61,13 @@ def markdown_table(results):
                       f"{r['true_positive_events']}/{r['events_scored']}",
                       str(r["false_alert_episodes"]), str(r["excess_repeat_episodes"]),
                       str(sum(e["type_correct"] for e in r["per_event"])),
-                      str(sum(e["class_correct"] for e in r["per_event"]))]
+                      str(sum(e["class_correct"] for e in r["per_event"])),
+                      _optional(r["median_lead_time_h"], 2), _optional(r["early_warning_rate"], 3)]
             rows.append("| " + " | ".join(values) + " |")
     for split in SPLITS:
         rows.append("| " + " | ".join(["B1 dichiarato", split, f"{DECLARED_B1[split]:.1f}"]
-                                        + ["-"] * (len(columns) - 3)) + " |")
+                                        + ["-"] * (len(columns) - 5)
+                                        + [f"{DECLARED_B1_LEAD[split]:.1f}", "-"]) + " |")
     return "\n".join(rows) + "\n"
 
 

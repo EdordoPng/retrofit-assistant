@@ -22,7 +22,8 @@ DATA = ROOT / "challenge" / "RETROFIT_AI_PARTICIPANTS_2026" / "data" / "full"
     ((0, 2), (1, 1), False), ((0, 0), (1, 1), False),
 ])
 def test_gate(full, reference, expected):
-    assert evaluate.gate(dict(zip(evaluate.SPLITS, full)), dict(zip(evaluate.SPLITS, reference))) is expected
+    assert evaluate.gate(full_scores=dict(zip(evaluate.SPLITS, full)),
+                         reference_scores=dict(zip(evaluate.SPLITS, reference))) is expected
 
 
 def synthetic_score():
@@ -54,6 +55,8 @@ def test_markdown_table_counts_and_columns():
         assert name in table
     assert "| B1 dichiarato | train | 58.2 |" in table
     assert "| B1 dichiarato | validation | 78.0 |" in table
+    assert "median_lead_time_h" in table and "early_warning_rate" in table
+    assert "| 55.8 | - |" in table and "| 8.3 | - |" in table
     assert "| 1/1 | 1 | 0 | 1 | 1 |" in table
 
 
@@ -99,8 +102,9 @@ def test_compare_end_to_end(tmp_path):
         for cells in ([cell.strip() for cell in line.strip("|\n ").split("|")] for line in table.splitlines())
         if cells[0] in evaluate.DETECTORS
     }
-    passed = evaluate.gate(*({split: composite[detector, split] for split in evaluate.SPLITS}
-                             for detector in evaluate.DETECTORS))
+    scores = {detector: {split: composite[detector, split] for split in evaluate.SPLITS}
+              for detector in evaluate.DETECTORS}
+    passed = evaluate.gate(full_scores=scores["full"], reference_scores=scores["causal_b1"])
     assert result.returncode == (0 if passed else 1), result.stderr
     assert ("GATE PASS" if passed else "GATE FAIL") in result.stdout
     assert "| causal_b1 | train | 58.451 |" in table
