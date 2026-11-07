@@ -1,5 +1,7 @@
 """Published B1 parameters and causal estimator constants."""
 
+import pandas as pd
+
 B1_K = 6.0
 B1_PERSIST = 15
 BASELINE_HOURS = 24
@@ -29,7 +31,18 @@ FAULT_TYPES = (
 DECIDED_BY = (
     "official", "official_protected", "rediagnose_confirmed", "rediagnose_refuted",
     "rediagnose_accelerometer", "rediagnose_noise", "source_stuck", "source_cavitation",
+    "rediagnose_spectrum",
 )
+
+# TECHNICAL_MODEL §7: one-second snapshots every 4 h, 2.8 kHz bearing
+# resonance, 2x misalignment; BPFO/BPFI orders come from assets.csv.
+# Band, line tolerance, ratios and two-cycle maximum age: fixed before measurement.
+SNAPSHOT_MAX_AGE = pd.Timedelta(hours=8)
+SPECTRUM_LINE_TOLERANCE = 0.03
+SPECTRUM_ENVELOPE_BAND_HZ = (2000, 3600)
+SPECTRUM_BEARING_RATIO = 6.0
+SPECTRUM_MISALIGNMENT_RATIO = 2.0
+SPECTRUM_NOISE_BAND_FACTORS = (0.5, 1.5)
 
 # sensors.py channel_specs: wireless bearing temperature has 0.5 C resolution
 # (dense: 0.1 C), wireless vibration resolutions are 0.01/0.001/0.01.

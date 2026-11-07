@@ -9,6 +9,7 @@ DECIDED_BY = (
     "official", "official_protected", "rediagnose_confirmed",
     "rediagnose_refuted", "rediagnose_accelerometer", "rediagnose_noise",
     "source_stuck", "source_cavitation",
+    "rediagnose_spectrum",
 )
 
 # Each pair is inspect / proposed action / alternative to rule out.

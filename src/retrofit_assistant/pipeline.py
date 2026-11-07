@@ -3,7 +3,7 @@
 import pandas as pd
 from retrofit_sim.baselines import b1_threshold
 
-from .data import load_assets, load_features
+from .data import load_assets, load_features, load_snapshots
 from .detectors import causal_b1, score_features
 from .diagnosis import rediagnose
 from .params import B1_K, B1_PERSIST
@@ -12,11 +12,11 @@ from .recommendations import recommend
 from .sources import cavitation_candidates, merge_candidates, stuck_candidates
 
 
-def candidate_stream(features, assets) -> pd.DataFrame:
+def candidate_stream(features, assets, snapshots=None) -> pd.DataFrame:
     """Merged, diagnosed and guided candidates with explicit provenance, before guarantees."""
     scored = score_features(features, assets)
     candidates = b1_threshold(scored, k=B1_K, persist=B1_PERSIST)
-    diagnosed = rediagnose(candidates, scored, assets)
+    diagnosed = rediagnose(candidates, scored, assets, snapshots)
     merged = merge_candidates(diagnosed, stuck_candidates(scored, assets, diagnosed),
                               cavitation_candidates(scored, assets, diagnosed))
     return recommend(merged)
@@ -29,4 +29,5 @@ def run_detector(data, split, detector="full", until=None) -> pd.DataFrame:
     features = load_features(data, assets, until=until)
     if detector == "causal_b1":
         return causal_b1(features, assets)
-    return apply_guarantees(candidate_stream(features, assets), features, assets)
+    snapshots = load_snapshots(data, assets, until=until)
+    return apply_guarantees(candidate_stream(features, assets, snapshots), features, assets)

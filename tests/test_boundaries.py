@@ -247,7 +247,8 @@ def test_runtime_inputs_availability_contract():
         "vibration_snapshots.parquet", "maintenance.csv",
     }
     assert set(AVAILABILITY) <= allowed
-    assert set(AVAILABILITY) == {"assets.csv", "features_1min.parquet"}
+    assert set(AVAILABILITY) == {"assets.csv", "features_1min.parquet", "vibration_snapshots.parquet"}
+    assert AVAILABILITY["vibration_snapshots.parquet"] == InputContract("timestamp_utc", pd.Timedelta(seconds=1))
     assert not any("events" in name or "benign" in name for name in AVAILABILITY)
     assert AVAILABILITY["assets.csv"] == InputContract(None, pd.Timedelta(0))
     contract = AVAILABILITY["features_1min.parquet"]

@@ -244,8 +244,8 @@ def _real_check(monkeypatch, fast):
 
         monkeypatch.setattr(pipeline, "load_assets", only_asset)
 
-        def capture_candidates(features, assets):
-            result = real_candidates(features, assets)
+        def capture_candidates(*args, **kwargs):
+            result = real_candidates(*args, **kwargs)
             captured["candidates"] = result
             return result
 

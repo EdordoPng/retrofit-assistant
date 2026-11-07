@@ -229,6 +229,10 @@ def test_predict_test_synthetic_only(synthetic, monkeypatch, capsys):
         "running_fraction": [1.0] * 30,
     })
     features.to_parquet(directory / "features_1min.parquet", index=False)
+    pd.DataFrame({"asset_id": pd.Series(dtype="str"),
+                  "timestamp_utc": pd.Series(dtype="datetime64[ns, UTC]")}).to_parquet(
+        directory / "vibration_snapshots.parquet", index=False,
+    )
     destination = "build/submission/predictions_test_20261107T120000Z_abcdef0.csv"
     assert cli.main(["predict", "--data", str(directory), "--split", "test", "--out", destination]) == 0
     captured = capsys.readouterr()

@@ -15,6 +15,7 @@ class InputContract:
 AVAILABILITY = {
     "assets.csv": InputContract(None, pd.Timedelta(0)),
     "features_1min.parquet": InputContract("window_start_utc", pd.Timedelta(seconds=60)),
+    "vibration_snapshots.parquet": InputContract("timestamp_utc", pd.Timedelta(seconds=1)),
 }
 
 
@@ -86,3 +87,22 @@ def load_features(data, assets, until=None) -> pd.DataFrame:
     if not frames:
         return features.iloc[:0].reset_index(drop=True)
     return pd.concat(frames, ignore_index=True).astype(dtypes)
+
+
+def load_snapshots(data, assets, until=None) -> pd.DataFrame:
+    """Read selected assets' one-second captures, completed by ``until``."""
+    if until is not None:
+        until = pd.Timestamp(until)
+        if until.tzinfo is None:
+            raise ValueError("until must be timezone-aware")
+        until = until.tz_convert("UTC")
+    asset_ids = assets["asset_id"].tolist()
+    filters = [("asset_id", "in", asset_ids)] if asset_ids else [
+        ("asset_id", "==", ""), ("asset_id", "!=", ""),
+    ]
+    snapshots = _read_input(data, "vibration_snapshots.parquet", filters=filters)
+    contract = AVAILABILITY["vibration_snapshots.parquet"]
+    snapshots[contract.time_column] = pd.to_datetime(snapshots[contract.time_column], utc=True)
+    if until is not None:
+        snapshots = snapshots.loc[snapshots[contract.time_column] + contract.latency <= until]
+    return snapshots.reset_index(drop=True)

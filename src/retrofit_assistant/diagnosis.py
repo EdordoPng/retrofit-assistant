@@ -6,9 +6,10 @@ from retrofit_sim.baselines import CH
 from .consistency import channel_snapshot, consistency_state, noise_channel, sensor_shape, steady_minutes
 from .data import AVAILABILITY
 from .params import ACCELEROMETER_CHANNELS, ACTUATOR_CHANNELS
+from .spectra import spectral_type
 
 
-def rediagnose(candidates, scored, assets):
+def rediagnose(candidates, scored, assets, snapshots=None):
     """Preserve candidate identity/order and attach audit states outside the CSV."""
     result = candidates.copy()
     result["decided_by"] = "official"
@@ -58,6 +59,14 @@ def rediagnose(candidates, scored, assets):
                 f"Verify {CH[key]} against an independent reference; review instrument history." if cls == "SENSOR"
                 else f"Inspect pump and verify {CH[key]} with independent measurements; cause uncertain.",
             ]
+        if snapshots is not None and cls == "MACHINE":
+            own = snapshots.loc[snapshots.asset_id == alert.asset_id]
+            spectral = spectral_type(own, history, metadata.loc[alert.asset_id], time)
+            if spectral is not None and spectral[0] != fault:
+                fault, why = spectral
+                result.loc[index, ["fault_type", "evidence", "decided_by"]] = [
+                    fault, why, "rediagnose_spectrum",
+                ]
         # Actuator readings describe the controller's response, never determine
         # the diagnosis of a process variable. Keep them visible as context even
         # when the official class/type is preserved.
