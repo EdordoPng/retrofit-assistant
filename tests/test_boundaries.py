@@ -99,20 +99,27 @@ def _scan(source, filename):
             violations.append("advisory: dynamic import")
         if not runtime:
             continue
-        if name in READERS and not loader:
+        reader_exception = Path(filename).name == "output.py" and name == "read_bytes"
+        if (name in READERS or name.startswith("read_")) and not loader and not reader_exception:
             violations.append("runtime: file reader")
         kwargs = {kw.arg: kw.value for kw in node.keywords}
         if _literal(kwargs.get("method")) in {"bfill", "backfill", "nearest"}:
             violations.append("runtime: future method")
+        if any(isinstance(arg, ast.Constant) and isinstance(arg.value, str)
+               and arg.value in {"bfill", "backfill", "nearest"} for arg in node.args):
+            violations.append("runtime: future method")
         if _literal(kwargs.get("center")) is True:
+            violations.append("runtime: centered window")
+        if name == "rolling" and len(node.args) >= 3 and _literal(node.args[2]) is True:
             violations.append("runtime: centered window")
         if name == "merge_asof" and _literal(kwargs.get("direction")) != "backward":
             violations.append("runtime: asof direction")
-        if name == "shift":
+        if name in {"shift", "diff", "pct_change"} and not resolved(node.func).startswith("numpy."):
             periods = kwargs.get("periods", node.args[0] if node.args else None)
-            value = _literal(periods)
-            if isinstance(value, (int, float)) and value < 0:
-                violations.append("runtime: future shift")
+            values = periods.elts if isinstance(periods, (ast.List, ast.Tuple)) else [periods]
+            if any(isinstance(value, ast.UnaryOp) and isinstance(value.op, ast.USub)
+                   for value in values):
+                violations.append("runtime: future periods")
     return violations
 
 
@@ -142,6 +149,16 @@ def test_runtime_inputs_source_boundaries():
     "x.rolling(3, center=True)", "pd.merge_asof(x, y, direction='nearest')",
     "pd.merge_asof(x, y, direction='forward')", "pd.merge_asof(x, y)",
     "x.shift(-1)", "x.shift(periods=-2)",
+    "y = x.interpolate", "pd.merge_asof(x, y, direction=d)",
+    "from pandas import merge_asof as join; join(x, y, direction='forward')",
+    "idx.get_indexer(t, 'nearest')", "x.f(t, 'bfill')", "x.f(t, 'backfill')",
+    "x.rolling(3, None, True)",
+    "pd.read_json('x')", "pd.read_excel('x')", "pd.read_feather('x')",
+    "pd.read_pickle('x')", "x.read_text()", "x.read_bytes()",
+    "from pandas import read_json as read; read('x')",
+    *[f"x.{method}({argument})" for method in ("shift", "diff", "pct_change")
+      for argument in ("-n", "periods=-n", "[-1]", "[1, -1]", "(1, -1)",
+                       "periods=[1, -1]", "periods=(1, -1)")],
 ])
 def test_runtime_inputs_scanner_rejects_synthetic(snippet):
     assert any(v.startswith("runtime:") for v in _scan(snippet, "detectors.py"))
@@ -154,10 +171,20 @@ x.ffill()
 x.rolling(3, center=False)
 pd.merge_asof(x, y, direction='backward')
 x.shift(1)
+x.shift(n)
+x.diff()
+x.diff(1)
+import numpy as np
+np.diff(-x)
+from numpy import diff as delta
+delta(-x)
 """
     assert _scan(snippet, "baseline.py") == []
     assert _scan("pd.read_csv('events_train.csv')", "evaluate.py") == []
     assert _scan("pd.read_parquet('x'); x = 'in_window'", "data.py") == []
+    assert _scan("x.read_bytes(); x.write_text('x')", "output.py") == []
+    assert "runtime: file reader" in _scan("x.read_text()", "output.py")
+    assert "runtime: file reader" in _scan("x.read_bytes()", "detectors.py")
 
 
 def test_advisory_only_source_boundaries():
