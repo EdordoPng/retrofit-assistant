@@ -53,6 +53,16 @@ It is **advisory only**. It never writes to devices, PLCs, drives or valves and 
 
 All data are the **synthetic** pumps of the official challenge package. Results are benchmark results, not field results.
 
+### Why rules and not a trained model
+
+There were two broad ways to approach this challenge: train a model on the data, or encode engineering knowledge in explicit rules. We chose rules for three reasons.
+
+- **Few labelled faults.** The training split has 26 scored events on 7 pumps, with 1 to 4 events per fault type; validation adds 9 events on 2 pumps. A classifier over 13 fault types would see very few examples of each, and a week of 1 Hz data per pump does not add independent incidents.
+- **Synthetic data.** The data come from a simulator. A model trained on them would learn the simulator's patterns and would need retraining on real labelled history before use. Rules state their physics (coupled channels, NPSH margin, bearing defect frequencies) and the parameters each machine needs, so on a real pump they can be checked and adjusted one at a time.
+- **Different instrumentation.** The pumps carry three tiers of sensors. Each rule switches itself off when its channels are missing, and every alert can be traced to the rule and the measurements that decided it, which is what an operator needs in order to review it.
+
+This does not make the system immune to overfitting: thresholds were chosen on the training pumps, and the baselines are estimated from each pump's own data. It has not been tested on real equipment, and moving to a real machine means re-measuring baselines, settle times and confidence levels (see [Transfer to another rotating machine](#transfer-to-another-rotating-machine) and [Pilot plan](#pilot-plan)). A trained model becomes a reasonable option once a site has real labelled history, and the evaluation code here can score it in the same way.
+
 ## Results at a glance
 
 Official scorer, composite score (0-100). B1 is the published baseline; `causal_b1` is our causal rebuild of B1 and the honest reference; `full` is this system.
