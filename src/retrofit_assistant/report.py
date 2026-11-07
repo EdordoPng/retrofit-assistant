@@ -20,6 +20,7 @@ from .data import load_assets, load_features
 from .output import COLUMNS
 from .params import STOP_MODES
 
+TIERS = {'T0_LEGACY': 'Legacy (T0)', 'T1_RETROFIT': 'Retrofit (T1)', 'T2_FULL': 'Full (T2)'}
 SIGNALS = ("vibration_rms_mm_s", "bearing_temp_c", "suction_pressure_kpa",
            "discharge_pressure_kpa", "flow_m3_h", "motor_current_a")
 SIGNAL_LABELS = {
@@ -62,6 +63,11 @@ def deviating_signal(evidence):
     return '-'
 
 
+def _condition_title(row):
+    title = f'{row.fault_type} — {row.event_class}'
+    return f'{title} — {deviating_signal(row.evidence)}' if row.fault_type == 'UNKNOWN' else title
+
+
 def _time(value):
     return pd.Timestamp(value).tz_convert('UTC').strftime('%d %b %Y, %H:%M UTC')
 
@@ -96,7 +102,8 @@ def generate(asset, data, predictions, out, until=None):
     conditions = []
     by_key = {}
     for _, row in alerts.iterrows():
-        key = (row.fault_type, row.event_class)
+        # UNKNOWN says nothing about the cause, so different signals are different conditions.
+        key = (row.fault_type, row.event_class, deviating_signal(row.evidence) if row.fault_type == 'UNKNOWN' else None)
         if key not in by_key:
             by_key[key] = len(conditions)
             conditions.append([])
@@ -176,7 +183,7 @@ def generate(asset, data, predictions, out, until=None):
                       ('Recommended action', row.recommended_action))
             items.append('<article class="alert"><time datetime="' + esc(row.alert_time_utc) + '"></time><h4>Alert ' + str(row['_number']) + '</h4>' + ''.join(
                 f'<p><strong>{esc(label)}:</strong> {esc(value)}</p>' for label, value in fields) + '</article>')
-        cards.append(f'<section class="condition"><h3>C{index}: {esc(first.fault_type)} — {esc(first.event_class)}</h3>'
+        cards.append(f'<section class="condition"><h3>C{index}: {esc(_condition_title(first))}</h3>'
                      f'<p>First: {esc(_time(first["_time"]))} | Last: {esc(_time(last["_time"]))} | Repetitions: {len(group)-1}</p>' + ''.join(items) + '</section>')
     if not cards:
         cards.append('<p>No alerts for this asset.</p>')
@@ -192,12 +199,12 @@ def generate(asset, data, predictions, out, until=None):
         action = '-'
     else:
         last_alert = alerts.iloc[-1]
-        latest = f'{last_alert.fault_type} — {last_alert.event_class}'
+        latest = _condition_title(last_alert)
         action = last_alert.recommended_action
     horizon = until if until is not None else metadata['window_end_utc']
     page = f'''<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Report {esc(asset)}</title>
 <style>body{{font-family:sans-serif;max-width:1100px;margin:2em auto;padding:0 1em;color:#243342}} img{{max-width:100%}} .alert,.condition,.summary{{border:1px solid #ccd4dc;border-radius:6px;padding:0 1em;margin:1em 0}} .summary{{background:#f1f5f8}}</style></head><body>
-<h1>Report: {esc(asset)}</h1><p>Split: {esc(metadata['split'])} | Tier: {esc(metadata['instrumentation_tier'])}</p>
+<h1>Report: {esc(asset)}</h1><p>Instrumentation: {esc(TIERS.get(metadata['instrumentation_tier'], metadata['instrumentation_tier']))}</p><p><small>Split: {esc(metadata['split'])}</small></p>
 <p>UTC window: {esc(_time(metadata['window_start_utc']))} — {esc(_time(horizon))} | Alerts: {len(alerts)}</p>
 <section class="summary"><h2>Summary</h2><p><strong>Advisory only: human review required</strong></p>
 <p>Data up to {esc(_time(horizon))}</p><p>Last data: {esc(state)}</p><p>Distinct conditions: {len(conditions)}</p>

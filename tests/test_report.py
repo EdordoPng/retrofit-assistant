@@ -16,7 +16,7 @@ DATA = Path('challenge/RETROFIT_AI_PARTICIPANTS_2026/data/full')
 @pytest.fixture
 def sample(tmp_path):
     start = pd.Timestamp('2026-01-01T00:00:00Z')
-    pd.DataFrame([dict(asset_id='A', split='train', instrumentation_tier='T0',
+    pd.DataFrame([dict(asset_id='A', split='train', instrumentation_tier='T0_LEGACY',
                        window_start_utc=start, window_end_utc=start + pd.Timedelta(minutes=3))]).to_csv(tmp_path / 'assets.csv', index=False)
     pd.DataFrame(dict(asset_id=['A', 'A'], window_start_utc=[start, start + pd.Timedelta(minutes=1)],
                       rows=[60, 60], discharge_pressure_kpa__mean=[1., 2.], motor_current_a__mean=[3., 4.])).to_parquet(tmp_path / 'features_1min.parquet', index=False)
@@ -244,3 +244,27 @@ def test_context_actuator_does_not_open_a_panel(sample, monkeypatch):
     assert invoke(sample) == 0
     assert report.SIGNAL_LABELS['fluid_temp_c'] in titles
     assert report.SIGNAL_LABELS['motor_speed_rpm'] not in titles
+
+
+def test_unknown_conditions_split_by_deviating_signal(sample):
+    rows = [
+        ['A', '2026-01-01T00:01:00Z', 'MACHINE', 'UNKNOWN', .5, 'full: fluid_temp_c z=2', 'Inspect'],
+        ['A', '2026-01-01T00:01:30Z', 'MACHINE', 'UNKNOWN', .5, 'full: fluid_temp_c z=3', 'Inspect'],
+        ['A', '2026-01-01T00:02:00Z', 'MACHINE', 'UNKNOWN', .5, 'full: vibration_crest_factor z=2', 'Inspect'],
+        ['A', '2026-01-01T00:02:30Z', 'MACHINE', 'BEARING_WEAR', .5, 'full: fluid_temp_c z=2', 'Inspect'],
+        ['A', '2026-01-01T00:02:40Z', 'MACHINE', 'BEARING_WEAR', .5, 'full: vibration_crest_factor z=2', 'Inspect'],
+    ]
+    pd.DataFrame(rows, columns=COLUMNS).to_csv(sample / 'predictions.csv', index=False)
+    assert invoke(sample) == 0
+    html = (sample / 'out/A.html').read_text()
+    assert 'Distinct conditions: 3' in html
+    assert 'C1: UNKNOWN — MACHINE — Fluid temperature' in html
+    assert 'C2: UNKNOWN — MACHINE — Vibration crest factor' in html
+    assert 'C3: BEARING_WEAR — MACHINE</h3>' in html
+
+
+def test_header_shows_readable_instrumentation(sample):
+    assert invoke(sample) == 0
+    html = (sample / 'out/A.html').read_text()
+    assert 'Instrumentation: Legacy (T0)' in html
+    assert '<small>Split: train</small>' in html and 'Tier:' not in html
