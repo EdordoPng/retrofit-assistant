@@ -34,6 +34,7 @@ def main(argv=None) -> int:
     predict.add_argument("--split", choices=("train", "validation", "test"), required=True)
     predict.add_argument("--out", required=True)
     predict.add_argument("--detector", choices=("full", "causal_b1"), default="full")
+    predict.add_argument("--mask-tier", choices=("T1", "T0"))
     check = commands.add_parser("check-submission", help="Validate a prediction CSV")
     check.add_argument("--predictions", required=True)
     check.add_argument("--data", required=True)
@@ -42,6 +43,9 @@ def main(argv=None) -> int:
     compare.add_argument("--data", required=True)
     compare.add_argument("--out", required=True)
     compare.add_argument("--gate", action="store_true")
+    ablate = commands.add_parser("ablate", help="Compare T2 instruments with T1 and T0 masks")
+    ablate.add_argument("--data", required=True)
+    ablate.add_argument("--out", required=True)
     report_parser = commands.add_parser("report", help="Write a static operator report")
     report_parser.add_argument("--asset", required=True)
     report_parser.add_argument("--data", required=True)
@@ -51,6 +55,15 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
     if args.command is None:
         parser.print_help()
+        return 0
+    if args.command == "ablate":
+        from . import ablation
+        try:
+            destination = ablation.ablate(args.data, args.out)
+        except Exception as exc:
+            print(f"Ablation failed: {type(exc).__name__}: {exc}", file=sys.stderr)
+            return 2
+        print(destination)
         return 0
     if args.command == "report":
         from . import report
@@ -75,11 +88,14 @@ def main(argv=None) -> int:
             print("GATE PASS" if passed else "GATE FAIL")
         return 0 if passed else 1
     if args.command == "predict":
+        if args.split == "test" and args.mask_tier is not None:
+            print("--mask-tier is limited to train and validation", file=sys.stderr)
+            return 2
         if args.split == "test" and not _test_destination(args.out):
             print("Invalid test output path", file=sys.stderr)
             return 2
         try:
-            frame = run_detector(args.data, args.split, detector=args.detector)
+            frame = run_detector(args.data, args.split, detector=args.detector, mask_tier=args.mask_tier)
             write_predictions(frame, args.out)
         except Exception:
             print("Prediction failed", file=sys.stderr)
