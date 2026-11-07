@@ -409,7 +409,8 @@ def test_pattern_uses_detector_scores_and_is_causal(pattern_sample, monkeypatch,
     frame.loc[115:116, 'operating_mode'] = ['STOPPED', 'LOCKED_OUT']
     available = frame.loc[frame.window_start_utc + pd.Timedelta(minutes=1) <= alert['_time']]
     expected = report.score_features(available, metadata.to_frame().T.infer_objects())
-    expected.loc[expected.operating_mode.isin(report.STOP_MODES), [prefix + key for key in ('q', 'pd', 'i')]] = float('nan')
+    hidden, _ = report.hidden_minutes(expected)
+    expected.loc[hidden, [prefix + key for key in ('q', 'pd', 'i')]] = float('nan')
     scored_inputs, plotted, limits, spans, axes_limits = [], [], [], [], []
     real_score, real_plot = report.score_features, Axes.plot
     real_hline, real_span, real_ylim = Axes.axhline, Axes.axvspan, Axes.set_ylim
@@ -445,7 +446,8 @@ def test_pattern_uses_detector_scores_and_is_causal(pattern_sample, monkeypatch,
     assert len(scored_inputs[0]) == 120
     assert scored_inputs[0].window_start_utc.max() == metadata.window_start_utc + pd.Timedelta(minutes=119)
     for (x, y, label), key in zip(plotted, ('q', 'pd', 'i')):
-        assert_series_equal(x, expected.window_start_utc)
+        assert x.is_monotonic_increasing and x.is_unique
+        assert x.index.equals(expected.window_start_utc.index)
         assert_series_equal(y, expected[prefix + key])
         assert y.iloc[115:117].isna().all()
         assert ('deviating' if key == 'q' else 'witness') in label
@@ -453,15 +455,15 @@ def test_pattern_uses_detector_scores_and_is_causal(pattern_sample, monkeypatch,
     assert axes_limits[-1] == (-expected_limit, expected_limit)
     assert {6., -6.} <= set(limits)
     if rule == 'variance':
-        assert {2., -2.} <= set(limits)
-        assert 'variance: Flow (m³/h) zs=' in original
+        assert 'witness band' not in original  # label is embedded in the plot
+        assert 'variance, median of the last 10 min: Flow (m³/h) zs=' in original
         assert 'within ±2' in original
     else:
         assert set(limits) == {6., -6.}
         assert 'mean: Flow (m³/h) z=' in original
     assert f'Last {hours} h up to the alert' in original
-    assert (metadata.window_start_utc + pd.Timedelta(minutes=115),
-            metadata.window_start_utc + pd.Timedelta(minutes=117), '#888888') in spans
+    assert (115., 116., '#888888') in spans
+    assert (116., 117., '#888888') in spans
     # Also mutate a minute already started at the alert but not yet complete.
     changed = frame.copy()
     future = changed.window_start_utc + pd.Timedelta(minutes=1) > alert['_time']
@@ -546,9 +548,12 @@ def test_pattern_rounding_agrees_with_shown_value(pattern_sample, monkeypatch, r
 
 
 @pytest.mark.parametrize('rule,prefix', [('mean', 'z_'), ('variance', 'zs_')])
-@pytest.mark.parametrize('witness,still', [(0., True), (2., True), (-2., True), (2.01, False)])
+@pytest.mark.parametrize('witness,still', [(0., True), (1.99, True), (2., False), (-2., False), (2.01, False)])
 def test_machine_reading_with_still_witnesses(pattern_sample, monkeypatch, rule, prefix, witness, still):
     frame, metadata, alert = pattern_sample
+    # This case prescribes two available witnesses; missing installed ones are tested separately.
+    metadata = metadata.copy()
+    metadata.channels_available = 'flow_m3_h|discharge_pressure_kpa|motor_current_a'
     alert.event_class = 'MACHINE'
     alert.evidence = 'flow_m3_h isolated variance' if rule == 'variance' else 'flow_m3_h deviation'
     fixed_pattern_scores(monkeypatch, frame.iloc[:120], dict(q=8., pd=witness, i=0.), prefix)
@@ -556,7 +561,7 @@ def test_machine_reading_with_still_witnesses(pattern_sample, monkeypatch, rule,
     required = ('Witnesses stay within ±2, so they do not explain this label; '
                 'it comes from another rule (see evidence).')
     assert (required in html) == still
-    assert (report.CLASS_READING['MACHINE'] in html) != still
+    assert ('moves with it: the change is real, in the machine.' in html) != still
 
 
 @pytest.mark.parametrize('rule,prefix', [('mean', 'z_'), ('variance', 'zs_')])
@@ -572,7 +577,7 @@ def test_stopped_scores_do_not_enter_pattern_sentence(pattern_sample, monkeypatc
     html = report.pattern_panel(alert, frame, metadata)
     assert '=+8.0 (beyond ±6)' in html
     assert '12345' not in html.split('<img')[0]
-    assert 'stopped minutes shaded and not scored' in html
+    assert f'no {"zs" if rule == "variance" else "z"} while stopped' in html
 
 
 def test_missing_candidate_score_does_not_promote_witness(pattern_sample, monkeypatch):
@@ -641,3 +646,230 @@ def test_generate_refuses_test_asset_before_predictions_or_features(asset, monke
     monkeypatch.setattr(report, 'load_features', forbidden)
     with pytest.raises(report.Refused, match='not a train or validation asset'):
         report.generate(asset, 'missing', 'missing.csv', 'build/refused')
+
+
+@pytest.fixture
+def pattern_chart(monkeypatch):
+    """Inspect rendered artist data rather than PNG pixels."""
+    from matplotlib.axes import Axes
+
+    captured = dict(lines=[], spans=[], texts=[], bands=[])
+    for method, bucket in [('plot', 'lines'), ('axvspan', 'spans'),
+                           ('text', 'texts'), ('axhspan', 'bands')]:
+        original = getattr(Axes, method)
+
+        def capture(ax, *args, _original=original, _bucket=bucket, **kwargs):
+            captured[_bucket].append((args, kwargs))
+            return _original(ax, *args, **kwargs)
+
+        monkeypatch.setattr(Axes, method, capture)
+    return captured
+
+
+def synthetic_pattern(pattern_sample, monkeypatch, values, *, rule='mean', event_class='SENSOR',
+                      fault_type='SENSOR_DRIFT', missing=()):
+    from retrofit_sim.baselines import CH
+
+    frame, metadata, alert = pattern_sample
+    metadata = metadata.copy()
+    metadata.channels_available = '|'.join(CH[key] for key in (*values, *missing))
+    alert = alert.copy()
+    alert.event_class, alert.fault_type = event_class, fault_type
+    alert.evidence = 'flow_m3_h isolated variance' if rule == 'variance' else 'flow_m3_h deviation'
+    scored = frame.iloc[:120].copy()
+    scored['steady'] = True
+    for key, value in values.items():
+        scored[CH[key] + '__mean'] = 1.
+        scored[CH[key] + '__count'] = 60.
+        scored[('zs_' if rule == 'variance' else 'z_') + key] = value
+    monkeypatch.setattr(report, 'score_features', lambda *args: scored)
+    return frame, metadata, alert, scored
+
+
+@pytest.mark.parametrize('minutes,width,label', [(172, 12, 'stopped 2 h 52 min'), (20, 20, None)])
+def test_pattern_compresses_only_long_stops(pattern_sample, monkeypatch, pattern_chart, minutes, width, label):
+    frame, metadata, alert, _ = synthetic_pattern(pattern_sample, monkeypatch, dict(q=8., pd=0., i=0.))
+    scored = pd.concat([frame.iloc[:1]] * (minutes + 4), ignore_index=True)
+    scored['window_start_utc'] = pd.date_range(metadata.window_start_utc, periods=len(scored), freq='min')
+    scored['operating_mode'] = 'RUNNING'
+    scored.loc[2:minutes + 1, 'operating_mode'] = 'STOPPED'
+    scored['steady'] = scored.operating_mode.eq('RUNNING')
+    for key, value in dict(q=8., pd=0., i=0.).items():
+        scored['z_' + key] = value
+    alert['_time'] = scored.window_start_utc.iloc[-1] + pd.Timedelta(minutes=1)
+    monkeypatch.setattr(report, 'score_features', lambda *args: scored)
+    html = report.pattern_panel(alert, scored, metadata)
+    x, y = pattern_chart['lines'][0][0][:2]
+    assert list(x[:2]) == [0., 1.]
+    assert x.iloc[minutes + 2] - x.iloc[2] == width
+    assert x.is_monotonic_increasing and x.is_unique
+    assert y.iloc[2:minutes + 2].isna().all()
+    assert y.iloc[[0, 1, minutes + 2, minutes + 3]].tolist() == [8.] * 4
+    labels = [args[2] for args, _ in pattern_chart['texts']]
+    if label:
+        assert label in labels
+        assert labels.count('//') == 2
+        assert [(args[0], args[1]) for args, _ in pattern_chart['spans']] == [(2., 14.)]
+    else:
+        assert not any(text.startswith('stopped ') for text in labels)
+        assert '//' not in labels
+    assert 'no z while stopped' in html
+
+
+@pytest.mark.parametrize('rule,prefix', [('mean', 'z_'), ('variance', 'zs_')])
+def test_transitions_next_to_stop_are_hidden_in_chart_and_sentence(pattern_sample, monkeypatch, pattern_chart, rule, prefix):
+    frame, metadata, alert, scored = synthetic_pattern(pattern_sample, monkeypatch, dict(q=8., pd=0., i=0.), rule=rule)
+    scored.loc[116:117, 'operating_mode'] = ['STOPPED', 'LOCKED_OUT']
+    scored.loc[114:119, 'steady'] = False
+    for key in ('q', 'pd', 'i'):
+        scored.loc[114:119, prefix + key] = 12345.
+    html = report.pattern_panel(alert, frame, metadata)
+    assert '12345' not in html.split('<img')[0]
+    assert '=+8.0 (beyond ±6)' in html
+    for args, _ in pattern_chart['lines']:
+        assert args[1].iloc[114:120].isna().all()
+        assert args[1].iloc[113:].notna().sum() == 1
+    assert {args[0] for args, _ in pattern_chart['spans']} == set(range(114, 120))
+
+
+@pytest.mark.parametrize('fault_type,verb', [('SENSOR_NOISE_SPIKES', 'is noisy'),
+                                           ('SENSOR_CALIBRATION_SHIFT', 'shifts'),
+                                           ('SENSOR_DRIFT', 'drifts'), ('UNKNOWN', 'deviates')])
+@pytest.mark.parametrize('rule', ['mean', 'variance'])
+def test_confirmed_sensor_sentence_uses_fault_verb(pattern_sample, monkeypatch, fault_type, verb, rule):
+    frame, metadata, alert, _ = synthetic_pattern(pattern_sample, monkeypatch,
+        dict(q=8., pd=1.99, i=-1.99), rule=rule, fault_type=fault_type)
+    html = report.pattern_panel(alert, frame, metadata)
+    assert (f'Flow {verb} while discharge pressure and motor current, which it should affect, '
+            'stay normal: the instrument is the likely cause, not the pump.') in html
+
+
+@pytest.mark.parametrize('witness', [2., -2.])
+@pytest.mark.parametrize('event_class', ['MACHINE', 'SENSOR'])
+def test_following_witness_at_exact_boundary(pattern_sample, monkeypatch, witness, event_class):
+    frame, metadata, alert, _ = synthetic_pattern(pattern_sample, monkeypatch,
+        dict(q=8., pd=witness, i=1.99), event_class=event_class)
+    html = report.pattern_panel(alert, frame, metadata)
+    if event_class == 'MACHINE':
+        assert 'Flow moves and discharge pressure moves with it: the change is real, in the machine.' in html
+    else:
+        assert report.CLASS_READING['SENSOR'] in html
+        assert 'the instrument is the likely cause' not in html
+
+
+@pytest.mark.parametrize('witnesses,wording', [
+    (dict(pd=0.), 'Only one independent witness is'), ({}, 'No independent witness is')])
+def test_sensor_cannot_be_confirmed_with_fewer_than_two_witnesses(pattern_sample, monkeypatch, witnesses, wording):
+    frame, metadata, alert, _ = synthetic_pattern(pattern_sample, monkeypatch, dict(q=8., **witnesses))
+    html = report.pattern_panel(alert, frame, metadata)
+    assert (f'{wording} available, so the instrument fault cannot be confirmed; '
+            'the official diagnosis stands.') in html
+
+
+@pytest.mark.parametrize('event_class', ['MACHINE', 'SENSOR'])
+def test_third_undrawn_witness_changes_sentence(pattern_sample, monkeypatch, pattern_chart, event_class):
+    frame, metadata, alert, scored = synthetic_pattern(pattern_sample, monkeypatch,
+        dict(q=8., pd=0., i=0., pw=0.), event_class=event_class)
+    original = report.pattern_panel(alert, frame, metadata)
+    scored['z_pw'] = 2.
+    changed = report.pattern_panel(alert, frame, metadata)
+    assert len(pattern_chart['lines']) == 6
+    assert all('Motor power' not in kwargs['label'] for _, kwargs in pattern_chart['lines'])
+    if event_class == 'MACHINE':
+        assert 'Witnesses stay within ±2' in original
+        assert 'Flow moves and motor power moves with it' in changed
+    else:
+        assert 'the instrument is the likely cause' in original
+        assert report.CLASS_READING['SENSOR'] in changed
+
+
+def test_missing_installed_witness_cannot_establish_stillness(pattern_sample, monkeypatch):
+    frame, metadata, alert, _ = synthetic_pattern(pattern_sample, monkeypatch,
+        dict(q=8., pd=0., i=0.), missing=('pw',))
+    html = report.pattern_panel(alert, frame, metadata)
+    assert 'Motor power (kW) has no score' in html
+    assert report.CLASS_READING['SENSOR'] in html
+    assert 'the instrument is the likely cause' not in html
+
+
+@pytest.mark.parametrize('event_class', ['SENSOR', 'MACHINE'])
+def test_variance_sentence_judges_recent_medians_not_last_spike(pattern_sample, monkeypatch, event_class):
+    frame, metadata, alert, scored = synthetic_pattern(pattern_sample, monkeypatch,
+        dict(q=8., pd=-.9, i=.9, pw=.9), rule='variance', event_class=event_class,
+        fault_type='SENSOR_NOISE_SPIKES')
+    scored.loc[119, 'zs_pw'] = 3.
+    scored.loc[119, 'zs_q'] = 30.
+    html = report.pattern_panel(alert, frame, metadata)
+    assert 'variance, median of the last 10 min: Flow (m³/h) zs=+8.0' in html
+    assert 'Motor power (kW) |zs|=0.9 (within ±2)' in html
+    assert 'Discharge pressure (kPa(g)) |zs|=0.9 (within ±2)' in html
+    assert ('the instrument is the likely cause' if event_class == 'SENSOR' else 'Witnesses stay within ±2') in html
+
+
+def test_mean_sentence_uses_latest_real_observation(pattern_sample, monkeypatch):
+    frame, metadata, alert, scored = synthetic_pattern(pattern_sample, monkeypatch, dict(q=8., pd=0., i=0.))
+    scored.loc[119, 'z_pd'] = 20.
+    scored.loc[119, 'discharge_pressure_kpa__count'] = 0.
+    html = report.pattern_panel(alert, frame, metadata)
+    assert 'Discharge pressure (kPa(g)) z=+0.0' in html
+    assert 'the instrument is the likely cause' in html
+
+
+@pytest.mark.parametrize('key', ['pd', 'q'])
+def test_hydraulic_pattern_excludes_suction_and_actuators(key):
+    from retrofit_sim.baselines import CH
+
+    channels = report.pattern_channels(CH[key], set(CH.values()), limit=None)
+    assert channels[0] == (key, CH[key])
+    assert not {'ps', 'n', 'vp'} & {k for k, _ in channels[1:]}
+
+
+@pytest.mark.parametrize('fault_type,color', [('SENSOR_DRIFT', '#CC79A7'), ('UNKNOWN', '#8A5A00')])
+def test_pattern_state_color_neutral_witnesses_and_threshold_labels(pattern_sample, monkeypatch, pattern_chart, fault_type, color):
+    frame, metadata, alert, _ = synthetic_pattern(pattern_sample, monkeypatch,
+        dict(q=8., pd=0., i=0.), fault_type=fault_type)
+    report.pattern_panel(alert, frame, metadata)
+    assert [kwargs['color'] for _, kwargs in pattern_chart['lines']] == [color, report.WITNESS_LINE, report.WITNESS_LINE]
+    assert pattern_chart['bands'][0][0][:2] == (-2., 2.)
+    assert {'witness band', 'deviation threshold'} <= {args[2] for args, _ in pattern_chart['texts']}
+
+
+@pytest.mark.parametrize('action', [
+    'Inspect: flow sensor. Do: compare a reference. Rule out first: air in the line.',
+    'Inspect: x.  Do: y. Rule out first: z. Note: human review.',
+    'Review the instrument before intervention.', '',
+])
+def test_action_lines_preserve_csv_text(action):
+    lines = report.action_lines(action)
+    assert ''.join(''.join(lines).split()) == ''.join(action.split())
+    if action.startswith('Inspect:'):
+        assert lines[0].startswith('Inspect:') and lines[1].startswith('Do:')
+        assert lines[2].startswith('Rule out first:')
+
+
+def test_reasons_cover_scorer_taxonomy_and_name_deviating_signal():
+    from retrofit_sim.scoring import FAULT_TYPES
+
+    assert set(report.REASONS) == FAULT_TYPES
+    alert = pd.Series(dict(fault_type='SENSOR_NOISE_SPIKES', evidence='flow_m3_h isolated variance'))
+    assert report.reason_text(alert) == 'Noise spikes on the flow sensor (instrument fault)'
+
+
+@pytest.mark.parametrize('pump,heading', [
+    (dict(asset_id='A', split='train', tier='JSON tier'), 'A · train · JSON tier'),
+    (None, 'A · train · T0'),
+])
+def test_report_title_uses_json_row_or_assets(sample, pump, heading):
+    html = report.generate('A', sample, sample / 'predictions.csv', sample / 'out', pump=pump).read_text()
+    assert f'<h1>{heading}</h1>' in html
+
+
+@pytest.mark.parametrize('pump', [dict(asset_id='B', split='train', tier='T2'),
+                                 dict(asset_id='A', split='validation', tier='T2')])
+def test_report_rejects_inconsistent_json_row_before_inputs(sample, monkeypatch, pump):
+    def forbidden(*args, **kwargs):
+        pytest.fail('Inconsistent row must fail before features are loaded')
+
+    monkeypatch.setattr(report, 'load_features', forbidden)
+    with pytest.raises(ValueError, match='does not match assets.csv'):
+        report.generate('A', sample, 'missing-predictions.csv', sample / 'out', pump=pump)

@@ -73,9 +73,9 @@ def test_dashboard_build_passes_paths_and_uses_only_train_validation(table, tmp_
     source.write_text(json.dumps(table))
     calls = []
 
-    def generate(asset, data, predictions, out):
+    def generate(asset, data, predictions, out, *, pump):
         assert asset not in {'PUMP-10', 'PUMP-11', 'PUMP-12'}
-        calls.append((asset, data, predictions, out))
+        calls.append((asset, data, predictions, out, pump))
         return Path(out) / f'{asset}.html'
 
     monkeypatch.setattr(report, 'generate', generate)
@@ -89,7 +89,8 @@ def test_dashboard_build_passes_paths_and_uses_only_train_validation(table, tmp_
     index = dashboard.build(source, 'data-path', predictions, 'build/dashboard')
     assert index == Path('build/dashboard/index.html')
     assert len(calls) == 9
-    for asset, data, prediction, out in calls:
+    for asset, data, prediction, out, pump in calls:
+        assert pump == next(row for row in table['pumps'] if row['asset_id'] == asset)
         assert data == 'data-path'
         assert prediction == ('train.csv' if int(asset[-2:]) <= 7 else 'validation.csv')
         assert out == Path('build/dashboard')
@@ -157,3 +158,27 @@ def test_fleet_is_self_contained_and_uses_brand_css_variables(table):
         assert report.BRAND not in colors
         assert f'--{name}:{colors[0]};--{name}-text:{colors[1]};--{name}-dark:{colors[2]};' in html
     assert '.state.attention{border-color:var(--attention-text);color:var(--attention-text)}' in html
+
+
+def test_fleet_tier_legend_follows_pump_table_once(table):
+    html = dashboard.fleet_page(table, {})
+    legend = ('T0: existing signals only (legacy) · T1: low-cost retrofit '
+              '(suction pressure, wireless vibration) · T2: fully instrumented.')
+    assert html.count(legend) == 1
+    assert html.index('</table>') < html.index(legend) < html.index('Official composite:')
+    assert html.split('</table>', 1)[1].startswith(f'\n<p>{legend}</p>')
+
+
+@pytest.mark.parametrize('commit,escaped', [('abc1234', 'abc1234'), ('<abc>&', '&lt;abc&gt;&amp;')])
+def test_fleet_distinguishes_frozen_detector_from_table_commit(table, commit, escaped):
+    table['commit'] = commit
+    html = dashboard.fleet_page(table, {})
+    assert dashboard.DETECTOR_FREEZE == 'v1.0-freeze (c355e31)'
+    expected = (f'Detector: v1.0-freeze (c355e31). Table generated at {escaped} '
+                '(evaluation code only).')
+    assert expected in html
+    assert html.index('Advisory only: human review required.') < html.index(expected)
+    for row in pump_rows(html):
+        source = next(pump for pump in table['pumps'] if pump['asset_id'] in row)
+        if source['split'] != 'test':
+            assert all(f'<td>{source[key]}</td>' in row for key in pump_table.COUNTS)

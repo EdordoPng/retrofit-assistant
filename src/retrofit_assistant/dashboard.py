@@ -12,6 +12,7 @@ import sys
 from . import report
 from .pump_table import COUNTS, TEST_STATUS
 
+DETECTOR_FREEZE = "v1.0-freeze (c355e31)"
 HEADERS = ("Pump", "Split", "Tier", "Scored events", "Detected", "Type correct",
            "Class correct", "False-alert episodes", "Excess repeats")
 
@@ -43,8 +44,9 @@ def fleet_page(table, links):
     notes = "".join(f"<li>{esc(note)}</li>" for note in table["notes"])
     return f'''<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Fleet overview</title>
 <style>{report.CSS}</style></head><body><h1>Fleet overview</h1>
-<p><strong>Advisory only: human review required.</strong> Generated at commit {esc(table["commit"])}.</p>
+<p><strong>Advisory only: human review required.</strong> Detector: {DETECTOR_FREEZE}. Table generated at {esc(table["commit"])} (evaluation code only).</p>
 <table><thead><tr>{"".join(f"<th>{h}</th>" for h in HEADERS)}</tr></thead><tbody>{"".join(rows)}</tbody></table>
+<p>T0: existing signals only (legacy) · T1: low-cost retrofit (suction pressure, wireless vibration) · T2: fully instrumented.</p>
 <p>Official composite: {composite}.</p><h2>What each split means</h2><ul>{roles}</ul>
 <h2>Instrumentation ablation (same T2 events, channels masked)</h2>
 <table><thead><tr><th>Tier</th><th>Split</th><th>Pumps</th><th>Composite</th><th>Detected / scored</th><th>Type correct</th></tr></thead>
@@ -61,7 +63,7 @@ def build(table_path, data, predictions, out):
     links = {}
     for pump in table["pumps"]:
         if pump["split"] in ("train", "validation") and pump["split"] in predictions:
-            page = report.generate(pump["asset_id"], data, predictions[pump["split"]], destination)
+            page = report.generate(pump["asset_id"], data, predictions[pump["split"]], destination, pump=pump)
             links[pump["asset_id"]] = page.name
     index = destination / "index.html"
     destination.mkdir(parents=True, exist_ok=True)
