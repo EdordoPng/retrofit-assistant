@@ -182,3 +182,13 @@ def test_fleet_distinguishes_frozen_detector_from_table_commit(table, commit, es
         source = next(pump for pump in table['pumps'] if pump['asset_id'] in row)
         if source['split'] != 'test':
             assert all(f'<td>{source[key]}</td>' in row for key in pump_table.COUNTS)
+
+
+def test_fleet_header_inlines_the_team_logo(table):
+    import re
+    html = dashboard.fleet_page(table, {})
+    tags = re.findall(r'<img class="brand"[^>]*>', html)
+    assert len(tags) == 1 and 'alt="DodoSolo"' in tags[0] and 'src="data:image/png;base64,' in tags[0]
+    assert len(tags[0].encode()) < 30 * 1024
+    assert '<header class="top"><h1>Fleet overview</h1>' in html
+    assert 'http://' not in html and 'https://' not in html and '<script' not in html.lower()

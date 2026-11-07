@@ -873,3 +873,35 @@ def test_report_rejects_inconsistent_json_row_before_inputs(sample, monkeypatch,
     monkeypatch.setattr(report, 'load_features', forbidden)
     with pytest.raises(ValueError, match='does not match assets.csv'):
         report.generate('A', sample, 'missing-predictions.csv', sample / 'out', pump=pump)
+
+
+def _brand_logo(html):
+    import re
+    tags = re.findall(r'<img class="brand"[^>]*>', html)
+    assert len(tags) == 1
+    tag = tags[0]
+    assert 'alt="DodoSolo"' in tag and 'height="40"' in tag and 'src="data:image/png;base64,' in tag
+    assert html.index('<header class="top"><h1>') < html.index(tag) < html.index('</header>')
+    return tag
+
+
+@pytest.mark.parametrize('until', [None, '2026-01-01T00:02:00Z'])
+def test_report_pages_inline_the_team_logo(sample, until):
+    args = ['report', '--asset', 'A', '--data', str(sample), '--predictions', str(sample / 'predictions.csv'),
+            '--out', str(sample / 'out')] + (['--until', until] if until else [])
+    assert main(args) == 0
+    page = next((sample / 'out').glob('A*.html')).read_text()
+    tag = _brand_logo(page)
+    assert len(tag.encode()) < 30 * 1024
+    assert '<h1>A · train · T0</h1>' in page
+    assert 'http://' not in page and 'https://' not in page and 'file://' not in page
+    assert '<script' not in page.lower() and 'src="/' not in page and "url(" not in page
+
+
+def test_logo_asset_is_package_data():
+    import tomllib
+    from pathlib import Path
+    assert report.LOGO_PNG.read_bytes()[:8] == b'\x89PNG\r\n\x1a\n'
+    assert report.LOGO_PNG.parent.name == 'assets'
+    config = tomllib.loads((Path(__file__).parents[1] / 'pyproject.toml').read_text())
+    assert 'assets/*.png' in config['tool']['setuptools']['package-data']['retrofit_assistant']

@@ -43,7 +43,7 @@ def fleet_page(table, links):
         for a in table["ablation"])
     notes = "".join(f"<li>{esc(note)}</li>" for note in table["notes"])
     return f'''<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Fleet overview</title>
-<style>{report.CSS}</style></head><body><h1>Fleet overview</h1>
+<style>{report.CSS}</style></head><body>{report.brand_header('Fleet overview')}
 <p><strong>Advisory only: human review required.</strong> Detector: {DETECTOR_FREEZE}. Table generated at {esc(table["commit"])} (evaluation code only).</p>
 <table><thead><tr>{"".join(f"<th>{h}</th>" for h in HEADERS)}</tr></thead><tbody>{"".join(rows)}</tbody></table>
 <p>T0: existing signals only (legacy) · T1: low-cost retrofit (suction pressure, wireless vibration and temperature) · T2: fully instrumented.</p>

@@ -94,9 +94,22 @@ CSS = (':root{--brand:%s;--bg:#FFFFFF;--ink:#243342;--border:#ccd4dc;--summary:#
        '.alert,.condition,.summary,.operator,.pattern{border:1px solid var(--border);border-radius:6px;padding:0 1em;margin:1em 0} '
        '.summary{background:var(--summary)} .operator{border-width:2px} '
        '.state{display:inline-block;padding:.1em .6em;border-radius:1em;font-weight:600;border:2px solid} %s '
-       'table{border-collapse:collapse} td,th{border:1px solid var(--border);padding:.2em .5em}'
+       'table{border-collapse:collapse} td,th{border:1px solid var(--border);padding:.2em .5em} '
+       '.top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.5em 1em} '
+       '.top h1{margin:.4em 0} .brand{height:40px;width:auto;flex:none}'
        ) % (BRAND, ''.join(f'--{n}:{f};--{n}-text:{t};--{n}-dark:{d};' for n, (f, t, d) in STATES.items()),
             ' '.join(f'.state.{n}{{border-color:var(--{n if n != "attention" else n + "-text"});color:var(--{n}-text)}}' for n in STATES))
+
+
+# Team logo, shipped as package data and inlined so every page stays self-contained.
+LOGO_PNG = Path(__file__).parent / "assets" / "dodosolo_80.png"
+
+
+def brand_header(title):
+    """Page title with the team logo at the top right; the logo wraps below on narrow screens."""
+    logo = base64.b64encode(LOGO_PNG.read_bytes()).decode("ascii")
+    return (f'<header class="top"><h1>{escape(str(title), quote=True)}</h1>'
+            f'<img class="brand" alt="DodoSolo" height="40" src="data:image/png;base64,{logo}"></header>')
 
 
 class Refused(ValueError):
@@ -541,7 +554,7 @@ def generate(asset, data, predictions, out, until=None, pump=None):
                f"{asset} · {metadata['split']} · {short_tier.get(metadata['instrumentation_tier'], metadata['instrumentation_tier'])}")
     page = f'''<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Report {esc(asset)}</title>
 <style>{CSS}</style></head><body>
-<h1>{esc(heading)}</h1>{operator}{pattern}<h2>Detail</h2><p>Instrumentation: {esc(TIERS.get(metadata['instrumentation_tier'], metadata['instrumentation_tier']))}</p><p><small>Split: {esc(metadata['split'])}</small></p>
+{brand_header(heading)}{operator}{pattern}<h2>Detail</h2><p>Instrumentation: {esc(TIERS.get(metadata['instrumentation_tier'], metadata['instrumentation_tier']))}</p><p><small>Split: {esc(metadata['split'])}</small></p>
 <p>UTC window: {esc(_time(metadata['window_start_utc']))} — {esc(_time(horizon))} | Alerts: {len(alerts)}</p>
 <section class="summary"><h2>Summary</h2><p><strong>Advisory only: human review required</strong></p>
 <p>Data up to {esc(_time(horizon))}</p><p>Last data: {esc(state)}</p><p>Distinct conditions: {len(conditions)}</p>
