@@ -84,6 +84,7 @@ WIRELESS_CHANNELS = ("v", "a", "c", "bt")  # TECHNICAL_MODEL instrumentation
 # TECHNICAL_MODEL §6 / plant.py: max winding tau=2400 s, bearing tau<=1500 s.
 # Three time constants leave ~5% thermal settling error (hypothesis, not train fit).
 THERMAL_SETTLE_MIN = 3 * 2400 // 60
+HELD_CHANNELS = ("wt", "bt", "c")
 # Oracle section 3: physical-value blocks 10-30 min; brief requires <=B1_PERSIST.
 SHAPE_BLOCK_MIN = 10
 RAMP_MIN_HOURS = 2

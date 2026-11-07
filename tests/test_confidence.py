@@ -1,6 +1,10 @@
 """Evidence-level provenance, train consistency and scorer-window boundaries."""
 
 from pathlib import Path
+import json
+import os
+import subprocess
+import sys
 
 import pandas as pd
 import pytest
@@ -44,7 +48,7 @@ def test_assign_changes_only_confidence_and_preserves_input():
     assert list(result.columns) == list(frame.columns)
     assert result.confidence.between(0, 1).all()
     for rule, value in zip(result.decided_by, result.confidence):
-        assert value == TRAIN_LEVELS[RULE_LEVELS[rule]].alert_reliability
+        assert value == TRAIN_LEVELS[RULE_LEVELS[rule]].type_reliability
 
 
 @pytest.mark.parametrize("rule", ["unknown_rule", "", None])
@@ -63,7 +67,7 @@ def test_empty_frame_is_copied_unchanged():
 @pytest.mark.parametrize("name", TRAIN_LEVELS)
 def test_report_shows_separate_train_reliabilities_and_csv_round_trip(name):
     level = TRAIN_LEVELS[name]
-    value = float(f"{level.alert_reliability:.6f}")
+    value = float(f"{level.type_reliability:.6f}")
     assert evidence_level(value) == name
     assert report._confidence(value) == (
         f"confidence {name} · alert {level.alert_reliability:.2f} (n={level.n})"
@@ -79,10 +83,20 @@ def test_unmatched_report_value_keeps_threshold_label(value, label):
 
 
 def test_train_measurement_matches_fixed_table():
-    assert evaluate.evaluate_confidence(DATA, "train") == TRAIN_LEVELS
+    code = f"""import json
+from dataclasses import asdict
+from retrofit_assistant.evaluate import evaluate_confidence
+print(json.dumps({{name: asdict(level) for name, level in
+                  evaluate_confidence({str(DATA)!r}, 'train').items()}}))
+"""
+    measured = subprocess.run(
+        [sys.executable, "-c", code], env={**os.environ, "PYTHONHASHSEED": "0"},
+        capture_output=True, text=True, check=True,
+    )
+    assert {name: EvidenceLevel(**level) for name, level in json.loads(measured.stdout).items()} == TRAIN_LEVELS
     assert TRAIN_LEVELS == {
         "high": EvidenceLevel(14, 14, 14),
-        "medium": EvidenceLevel(34, 31, 20),
+        "medium": EvidenceLevel(32, 31, 20),
         "low": EvidenceLevel(3, 2, 0),
     }
 

@@ -7,6 +7,7 @@ from .confidence import assign_confidence
 from .data import load_assets, load_features, load_snapshots
 from .detectors import causal_b1, score_features
 from .diagnosis import rediagnose
+from .hold import hold_after_restart
 from .params import B1_K, B1_PERSIST
 from .policy import apply_guarantees
 from .recommendations import recommend
@@ -20,7 +21,7 @@ def candidate_stream(features, assets, snapshots=None) -> pd.DataFrame:
     diagnosed = rediagnose(candidates, scored, assets, snapshots)
     merged = merge_candidates(diagnosed, stuck_candidates(scored, assets, diagnosed),
                               cavitation_candidates(scored, assets, diagnosed))
-    return assign_confidence(recommend(merged))
+    return assign_confidence(recommend(hold_after_restart(merged, scored)))
 
 
 def run_detector(data, split, detector="full", until=None, mask_tier=None) -> pd.DataFrame:

@@ -106,7 +106,15 @@ def _cuts(asset, start, end, complete, fast):
     }
     alerts = sorted({pd.Timestamp(t) for frame in complete.values() for t in frame.alert_time_utc})
     groups["alert"] = [t + pd.Timedelta(seconds=s) for t in alerts for s in (-1, 0, 1)]
+    candidates = complete.get("candidates")
+    held_times = []
+    if candidates is not None and "held_from_utc" in candidates:
+        held = candidates.loc[candidates.held_from_utc.notna() & candidates.held_from_utc.ne("")]
+        held_times = [pd.Timestamp(t) for t in held.alert_time_utc]
+    held_cuts = [t + pd.Timedelta(minutes=m) for t in held_times for m in (-1, 0, 1)]
+    groups["held_emissions"] = held_cuts
     derived = set(groups["alert"])
+    derived.update(held_cuts)
     if fast:
         # Start from one cut per category: edge, minute +/-1 s, freeze,
         # first alert +/-1 s (and exact), and one random cut.
@@ -128,6 +136,7 @@ def _cuts(asset, start, end, complete, fast):
             groups["all_source_alerts"] = [pd.Timestamp(t) for t in sources.alert_time_utc]
         # Also cut at scheduled emissions, including sources deferred by spacing.
         groups["all_emissions"] = [pd.Timestamp(t) for t in complete["full"].alert_time_utc]
+        groups["held_emissions"] = held_cuts
     return [(cut, cut in derived) for cut in sorted(set(sum(groups.values(), []))) if start <= cut < end]
 
 

@@ -32,27 +32,27 @@ RULE_LEVELS = {
 }
 TRAIN_LEVELS = {
     "high": EvidenceLevel(n=14, alert_hits=14, type_hits=14),
-    "medium": EvidenceLevel(n=34, alert_hits=31, type_hits=20),
+    "medium": EvidenceLevel(n=32, alert_hits=31, type_hits=20),
     "low": EvidenceLevel(n=3, alert_hits=2, type_hits=0),
 }
 
 
 def evidence_level(value):
-    """Recognise a level's alert estimate, allowing six-decimal CSV rounding."""
+    """Recognise a level's type estimate, allowing six-decimal CSV rounding."""
     for name, level in TRAIN_LEVELS.items():
-        if isclose(float(value), level.alert_reliability, rel_tol=0, abs_tol=5e-7):
+        if isclose(float(value), level.type_reliability, rel_tol=0, abs_tol=5e-7):
             return name
     return None
 
 
 def assign_confidence(alerts):
-    """Copy alerts, changing only confidence to the rule's train evidence level."""
+    """Copy alerts, changing only confidence to the rule's train type reliability."""
     result = alerts.copy()
     if result.empty:
         return result
     if not result.decided_by.isin(RULE_LEVELS).all():
         raise ValueError("Unknown decided_by for evidence level")
     result["confidence"] = result.decided_by.map(RULE_LEVELS).map(
-        {name: level.alert_reliability for name, level in TRAIN_LEVELS.items()}
+        {name: level.type_reliability for name, level in TRAIN_LEVELS.items()}
     )
     return result
