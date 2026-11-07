@@ -38,10 +38,24 @@ def main(argv=None) -> int:
     check.add_argument("--predictions", required=True)
     check.add_argument("--data", required=True)
     check.add_argument("--split", choices=("train", "validation", "test"), required=True)
+    compare = commands.add_parser("compare", help="Compare train and validation scores")
+    compare.add_argument("--data", required=True)
+    compare.add_argument("--out", required=True)
+    compare.add_argument("--gate", action="store_true")
     args = parser.parse_args(argv)
     if args.command is None:
         parser.print_help()
         return 0
+    if args.command == "compare":
+        try:
+            from . import evaluate
+            passed = evaluate.compare(args.data, args.out, use_gate=args.gate)
+        except Exception as exc:
+            print(f"Compare failed: {type(exc).__name__}: {exc}", file=sys.stderr)
+            return 2
+        if args.gate:
+            print("GATE PASS" if passed else "GATE FAIL")
+        return 0 if passed else 1
     if args.command == "predict":
         if args.split == "test" and not _test_destination(args.out):
             print("Invalid test output path", file=sys.stderr)

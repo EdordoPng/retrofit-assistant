@@ -72,7 +72,7 @@ def _scan(source, filename):
                 if parts[0] in BLOCKED_IMPORTS:
                     violations.append("advisory: import " + name)
                 if runtime:
-                    if any(part in DEVELOPMENT for part in parts):
+                    if Path(filename).name != "cli.py" and any(part in DEVELOPMENT for part in parts):
                         violations.append("runtime: development import")
                     if parts[0] == "retrofit_sim" and not (
                         isinstance(node, ast.ImportFrom)
@@ -121,6 +121,17 @@ def _scan(source, filename):
                    for value in values):
                 violations.append("runtime: future periods")
     return violations
+
+
+def test_cli_development_import_exception_is_narrow():
+    snippet = "from . import evaluate"
+    assert not any(v.startswith("runtime:") for v in _scan(snippet, "cli.py"))
+    for filename in ("detectors.py", "pipeline.py", "__main__.py"):
+        assert "runtime: development import" in _scan(snippet, filename)
+    for source in ("pd.read_csv('x')", "x = 'events_train.csv'", "x.bfill()",
+                   "from retrofit_sim.scoring import score"):
+        assert any(v.startswith("runtime:") for v in _scan(source, "cli.py"))
+    assert any(v.startswith("advisory:") for v in _scan("import socket", "cli.py"))
 
 
 def _sources():
