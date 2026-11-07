@@ -106,7 +106,7 @@ python -m retrofit_assistant report --asset PUMP-08 --data $D --predictions buil
 
 On a clean clone of the tag, installation took about 30 seconds after the download, the validation score was reproduced in about 40 seconds, and the 38 official package tests passed. The runtime code on main is identical to the tag.
 
-The detector is frozen at tag `v1.0-freeze`. `main` adds only evaluation and reporting code, documentation and `submission/`; to check it, run `git diff --stat v1.0-freeze -- src/`: only `pump_table.py`, `dashboard.py` and `report.py` change.
+The detector is frozen at tag `v1.0-freeze`. `main` adds only evaluation and reporting code, documentation and `submission/`; to check it, run `git diff --stat v1.0-freeze -- src/`: only `pump_table.py`, `dashboard.py`, `report.py` and the logo `assets/dodosolo_80.png` change.
 
 On Python 3.10-3.11, install with `challenge/RETROFIT_AI_PARTICIPANTS_2026/requirements.txt` instead of the lock file; that path has not been tested.
 
