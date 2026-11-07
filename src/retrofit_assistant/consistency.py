@@ -112,6 +112,9 @@ def consistency_state(snapshot, installed, settled_minutes):
     A positively isolated channel takes priority. Otherwise a following reference
     refutes isolation. Missing/NaN references never establish stillness.
     """
+    # Design choice, not measured: one still witness is not enough to
+    # declare a sensor fault.
+    MIN_STILL_WITNESSES = 2
     # Python's stable sort retains CH as the explicit tie-breaker.
     deviating = tuple(sorted((key for key in CH if key in snapshot
         and (key not in ("wt", "bt") or settled_minutes >= THERMAL_SETTLE_MIN)
@@ -120,15 +123,16 @@ def consistency_state(snapshot, installed, settled_minutes):
     following = None
     for key in deviating:
         # Only installed coupled instruments can participate; the snapshot omits
-        # absent/stale instruments. At least one real reference is necessary.
-        coupled = coupled_channels(key, installed)
+        # absent/stale instruments. Suction may mask a hydraulic fault.
+        coupled = tuple(c for c in coupled_channels(key, installed)
+                        if not (key in ("pd", "q") and c == "ps"))
         values = [snapshot[c].get("z_" + c, np.nan) for c in coupled if c in snapshot]
         finite = [value for value in values if np.isfinite(value)]
         threshold = B1_K * COUPLED_STILL_FRACTION
         if finite and any(abs(value) >= threshold for value in finite):
             if following is None:
                 following = key
-        elif finite and len(finite) == len(coupled):
+        elif len(coupled) >= MIN_STILL_WITNESSES and len(finite) == len(coupled):
             return "confirmed", key, deviating
     if following is not None:
         return "refuted", following, deviating

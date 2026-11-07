@@ -55,7 +55,8 @@ def fixture(shape="ramp", key="pd", references=("i",), cls="SENSOR", fault="SENS
 @pytest.mark.parametrize("shape,fault", [("step", "SENSOR_CALIBRATION_SHIFT"), ("ramp", "SENSOR_DRIFT"),
                                          ("noise", "SENSOR_NOISE_SPIKES"), ("ambiguous", "UNKNOWN")])
 def test_confirmed_physical_shapes(shape, fault):
-    candidates, frame, assets = fixture(shape, cls="MACHINE", fault="UNKNOWN")
+    references = ("i",) if shape == "noise" else ("i", "pw")
+    candidates, frame, assets = fixture(shape, references=references, cls="MACHINE", fault="UNKNOWN")
     result = rediagnose(candidates, frame, assets)
     assert result.iloc[0].event_class == "SENSOR"
     assert result.iloc[0].fault_type == fault
@@ -66,11 +67,13 @@ def test_confirmed_physical_shapes(shape, fault):
 def test_single_process_transmitter_drift_stays_sensor():
     args = fixture()
     result = rediagnose(*args)
-    assert tuple(result.iloc[0][["event_class", "fault_type"]]) == ("SENSOR", "SENSOR_DRIFT")
+    assert tuple(result.iloc[0][["event_class", "fault_type"]]) == tuple(args[0].iloc[0][["event_class", "fault_type"]])
+    assert result.attrs["diagnosis_states"][0]["state"] == "unverifiable"
+    assert result.decided_by.tolist() == ["official"]
 
 
 def test_ambiguous_confirmed_shape_preserves_official_sensor_type():
-    candidates, frame, assets = fixture("ambiguous")
+    candidates, frame, assets = fixture("ambiguous", references=("i", "pw"))
     original = candidates.copy(deep=True)
     result = rediagnose(candidates, frame, assets)
     assert_frame_equal(result[COLUMNS], original, check_exact=True)
@@ -126,7 +129,7 @@ def test_protected_official_diagnoses(fault):
 
 
 def test_rows_order_times_and_confidence_unchanged():
-    candidates, frame, assets = fixture()
+    candidates, frame, assets = fixture(references=("i", "pw"))
     candidates = pd.concat([candidates, candidates.assign(confidence=0.42)], ignore_index=True)
     candidates.index = [9, 4]
     original = candidates.copy(deep=True)
@@ -164,7 +167,7 @@ def test_availability_future_and_permutations():
 
 @pytest.mark.parametrize("shape,fault", [("step", "SENSOR_CALIBRATION_SHIFT"), ("ramp", "SENSOR_DRIFT")])
 def test_wireless_real_updates(shape, fault):
-    result = rediagnose(*fixture(shape, key="bt", references=("tf",), wireless=True))
+    result = rediagnose(*fixture(shape, key="bt", references=("tf", "v"), wireless=True))
     assert result.iloc[0].fault_type == fault
     assert result.attrs["diagnosis_states"][0]["state"] == "confirmed"
 
@@ -204,7 +207,7 @@ def test_onset_is_current_episode_not_first_historical_deviation():
 
 
 def test_step_remains_visible_beyond_six_hours():
-    candidates, frame, assets = fixture("step", cls="MACHINE", fault="UNKNOWN")
+    candidates, frame, assets = fixture("step", references=("i", "pw"), cls="MACHINE", fault="UNKNOWN")
     extra = pd.concat([frame.iloc[[-1]]] * 480, ignore_index=True)
     extra.window_start_utc = pd.date_range(frame.window_start_utc.iloc[-1] + pd.Timedelta(minutes=1), periods=480, freq="min")
     extended = pd.concat([frame, extra], ignore_index=True)
@@ -214,7 +217,7 @@ def test_step_remains_visible_beyond_six_hours():
 
 @pytest.mark.parametrize("interruption", ["stop", "missing"])
 def test_no_physical_shape_across_interrupted_before_after(interruption):
-    candidates, frame, assets = fixture("step", cls="MACHINE", fault="UNKNOWN")
+    candidates, frame, assets = fixture("step", references=("i", "pw"), cls="MACHINE", fault="UNKNOWN")
     if interruption == "stop":
         frame.loc[235:238, "steady"] = False
     else:
@@ -225,7 +228,7 @@ def test_no_physical_shape_across_interrupted_before_after(interruption):
 
 @pytest.mark.parametrize("settled", [False, True])
 def test_thermal_deviation_only_counts_after_model_settling(settled):
-    candidates, frame, assets = fixture("step", key="wt", references=("i",), fault="SENSOR_DRIFT")
+    candidates, frame, assets = fixture("step", key="wt", references=("i", "pw"), fault="SENSOR_DRIFT")
     frame["steady"] = False
     frame.loc[frame.index[-(params.THERMAL_SETTLE_MIN if settled else 15):], "steady"] = True
     original = candidates.copy(deep=True)
@@ -314,7 +317,7 @@ def test_noise_requires_three_real_recent_observations():
 
 
 def test_controlled_flow_drift_with_persistent_speed_compensation_is_sensor():
-    candidates, frame, assets = fixture("ramp", key="q", references=("i", "n"))
+    candidates, frame, assets = fixture("ramp", key="q", references=("i", "pw", "n"))
     frame.loc[30:, "z_n"] = -9
     frame.loc[30:, CH["n"] + "__mean"] -= np.arange(330) / 20
     result = rediagnose(candidates, frame, assets)
@@ -365,6 +368,7 @@ def test_decided_by_contract_without_input_mutation(scenario, expected):
             "noise" if scenario == "noise" else "step",
             cls="MACHINE" if scenario == "machine_refuted" else "SENSOR",
             fault="SENSOR_STUCK" if scenario == "protected" else "SENSOR_DRIFT",
+            references=("i", "pw") if scenario == "confirmed" else ("i",),
         )
         if scenario in ("refuted", "machine_refuted"):
             frame["z_i"] = 5.0
@@ -375,3 +379,60 @@ def test_decided_by_contract_without_input_mutation(scenario, expected):
     assert expected in params.DECIDED_BY
     assert_frame_equal(candidates, original, check_exact=True)
     assert "decided_by" not in result.attrs
+
+
+@pytest.mark.parametrize("current_z,state", [(-1.5, "unverifiable"), (-2.5, "refuted")])
+def test_masked_suction_strainer_clogging_keeps_official_machine(current_z, state):
+    candidates, frame, assets = fixture(
+        key="pd", references=("i", "ps"), cls="MACHINE", fault="SUCTION_STRAINER_CLOGGING",
+    )
+    assets["instrumentation_tier"] = "T1_RETROFIT"
+    assets["control"] = "FLOW_VALVE"
+    # Three-hour pressure loss; all physical means use the same baseline and
+    # channel scale as their synthetic z values.
+    frame["z_pd"] = 0.0
+    frame.loc[180:, "z_pd"] = np.linspace(0, -8, 180)
+    frame["z_ps"] = np.random.default_rng(7).uniform(-0.3, 0.3, len(frame))
+    frame["z_i"] = current_z
+    for key in ("pd", "ps", "i"):
+        frame[CH[key] + "__mean"] = 100 + frame["z_" + key] * params.Z_FLOORS[key]
+    # The T1 loop has valve feedback, which remains actuator context only.
+    assets.loc[0, "channels_available"] += "|" + CH["vp"]
+    frame[CH["vp"] + "__mean"] = 50.0
+    frame[CH["vp"] + "__count"] = 60.0
+    frame[CH["vp"] + "__std"] = 0.1
+    frame["z_vp"] = 0.0
+    frame["zs_vp"] = 0.0
+    frame.loc[180:, "z_vp"] = np.linspace(0, 4, 180)
+    frame[CH["vp"] + "__mean"] += frame["z_vp"] * params.Z_FLOORS["vp"]
+    result = rediagnose(candidates, frame, assets)
+    assert tuple(result.iloc[0][["event_class", "fault_type"]]) == ("MACHINE", "SUCTION_STRAINER_CLOGGING")
+    assert result.attrs["diagnosis_states"][0]["state"] == state
+    assert result.decided_by.tolist() == ["official"]
+    assert "valve_position_pct=" in result.iloc[0].evidence
+
+
+def test_t2_two_still_witnesses_confirm_pressure_sensor():
+    candidates, frame, assets = fixture(key="pd", references=("i", "pw"), cls="MACHINE", fault="UNKNOWN")
+    assets["instrumentation_tier"] = "T2_FULL"
+    result = rediagnose(candidates, frame, assets)
+    assert tuple(result.iloc[0][["event_class", "fault_type"]]) == ("SENSOR", "SENSOR_DRIFT")
+    assert result.attrs["diagnosis_states"][0]["state"] == "confirmed"
+    assert result.decided_by.tolist() == ["rediagnose_confirmed"]
+
+
+@pytest.mark.parametrize("current_z,state,cls,decided_by", [
+    (0.0, "confirmed", "SENSOR", "rediagnose_confirmed"),
+    (-2.5, "refuted", "MACHINE", "official"),
+])
+def test_flow_ignores_moving_suction_pressure(current_z, state, cls, decided_by):
+    candidates, frame, assets = fixture(key="q", references=("i", "pw", "ps"), cls="MACHINE", fault="UNKNOWN")
+    # Below B1_K so ps is moving but is not itself a deviating candidate.
+    frame["z_ps"] = -3.0
+    frame[CH["ps"] + "__mean"] = 100 + frame.z_ps * params.Z_FLOORS["ps"]
+    frame["z_i"] = current_z
+    frame[CH["i"] + "__mean"] = 100 + frame.z_i * params.Z_FLOORS["i"]
+    result = rediagnose(candidates, frame, assets)
+    assert result.iloc[0].event_class == cls
+    assert result.attrs["diagnosis_states"][0]["state"] == state
+    assert result.decided_by.tolist() == [decided_by]
