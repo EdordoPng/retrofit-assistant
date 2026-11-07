@@ -8,7 +8,7 @@ from .detectors import causal_b1, score_features
 from .diagnosis import rediagnose
 from .params import B1_K, B1_PERSIST
 from .policy import apply_guarantees
-from .sources import merge_candidates, stuck_candidates
+from .sources import cavitation_candidates, merge_candidates, stuck_candidates
 
 
 def candidate_stream(features, assets) -> pd.DataFrame:
@@ -16,7 +16,8 @@ def candidate_stream(features, assets) -> pd.DataFrame:
     scored = score_features(features, assets)
     candidates = b1_threshold(scored, k=B1_K, persist=B1_PERSIST)
     diagnosed = rediagnose(candidates, scored, assets)
-    return merge_candidates(diagnosed, stuck_candidates(scored, assets, diagnosed))
+    return merge_candidates(diagnosed, stuck_candidates(scored, assets, diagnosed),
+                            cavitation_candidates(scored, assets, diagnosed))
 
 
 def run_detector(data, split, detector="full", until=None) -> pd.DataFrame:

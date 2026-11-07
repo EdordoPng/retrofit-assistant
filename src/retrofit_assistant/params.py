@@ -44,6 +44,23 @@ STUCK_BOUNDS = {
     "ps": (-100, 600), "wt": (-20, 200), "tf": (-20, 120), "vp": (0, 100),
 }
 
+# NPSH from suction absolute pressure and vapour pressure: KSB Pump Lexicon,
+# https://www.ksb.com/en-global/centrifugal-pump-lexicon/article/npsh-1116954
+# 1.15 is the brief's hypothesis, not a universal hydraulic safety margin.
+CAVITATION_NPSH_MARGIN = 1.15
+CAVITATION_MIN_MIN = 5
+CAVITATION_ATMOSPHERE_KPA = 101.325  # nominal sea-level pressure; site uncertainty
+CAVITATION_WATER_DENSITY_KG_M3 = 1000.0  # water approximation, not a fluid-property fit
+CAVITATION_GRAVITY_M_S2 = 9.80665
+# TECHNICAL_MODEL §3: suction sizing 2.5 m/s at nameplate BEP. Geometry is
+# unavailable; this is an explicit estimate, used only when flow is measured.
+CAVITATION_SUCTION_VELOCITY_BEP_M_S = 2.5
+CAVITATION_ACCEL_MIN_HISTORY = 3  # evidence only, never delays the NPSH trigger
+# NIST WebBook water, Stull (1947), 255.9..373 K; P in bar, T in kelvin.
+# https://webbook.nist.gov/cgi/cbook.cgi?ID=C7732185&Type=ANTOINE
+CAVITATION_ANTOINE = (4.6543, 1435.264, -64.848)
+CAVITATION_ANTOINE_K_RANGE = (255.9, 373.0)
+
 # Coupled-channel stillness: published diagnose uses k / 3.
 COUPLED_STILL_FRACTION = 1 / 3
 # In a closed loop these actuators react to the measurement, so they are not

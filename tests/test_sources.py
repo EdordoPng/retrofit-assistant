@@ -13,7 +13,10 @@ from retrofit_assistant.data import AVAILABILITY
 from retrofit_assistant.output import COLUMNS, write_predictions
 from retrofit_assistant.params import ALERT_SPACING_MIN, STUCK_MIN_UPDATES
 from retrofit_assistant.policy import apply_guarantees
-from retrofit_assistant.sources import INTERNAL_COLUMNS, merge_candidates, stuck_candidates
+from retrofit_assistant.sources import (
+    INTERNAL_COLUMNS, cavitation_candidates, merge_candidates, npsh_available_m,
+    stuck_candidates, vapour_pressure_kpa,
+)
 
 START = pd.Timestamp("2026-01-01T00:00:00Z")
 
@@ -218,3 +221,162 @@ def test_provenance_removed_by_guarantees_and_csv_writer(tmp_path):
     write_predictions(result, path)
     assert pd.read_csv(io.StringIO(path.read_text())).columns.tolist() == COLUMNS
     assert "decided_by" not in path.read_text()
+
+
+def cavitation_fixture(pressure):
+    minutes, assets = fixture(pressure, key="ps")
+    minutes["fluid_temp_c__mean"] = 20.0
+    minutes["fluid_temp_c__count"] = 60.0
+    assets["channels_available"] += "|fluid_temp_c"
+    assets["instrumentation_tier"] = "T1_RETROFIT"
+    assets["npsh3_at_bep_m"] = 4.0
+    assets["motor_rated_rpm"] = 1800.0
+    assets["pump_rated_flow_m3_h"] = 100.0
+    return minutes, assets
+
+
+def cavitation_detect(minutes, assets, prior=None, until=None):
+    return cavitation_candidates(minutes, assets, existing() if prior is None else prior, until=until)
+
+
+@pytest.mark.parametrize("temperature,pressure", [(20, 2.339), (40, 7.385), (60, 19.946), (80, 47.415)])
+def test_vapour_pressure_against_water_saturation_table(temperature, pressure):
+    # Standard saturated-water table values (kPa), independent of Antoine coefficients.
+    # NIST Stull broad-range fit is an approximation; engineering tolerance 3%.
+    assert vapour_pressure_kpa(temperature) == pytest.approx(pressure, rel=0.03)
+
+
+@pytest.mark.parametrize("temperature", [-30, 120, np.nan])
+def test_vapour_pressure_does_not_extrapolate(temperature):
+    assert np.isnan(vapour_pressure_kpa(temperature))
+
+
+def test_npsh_uses_gauge_plus_atmosphere_and_velocity_only_with_flow():
+    static = npsh_available_m(-20.0, 20.0)
+    assert static == pytest.approx((101.325 - 20 - 2.339) / 9.80665, abs=0.003)
+    assert npsh_available_m(-20.0, 20.0, None, 100) == static
+    assert npsh_available_m(-20.0, 20.0, 100, None) == static
+    assert npsh_available_m(-20.0, 20.0, 100, 100) - static == pytest.approx(2.5 ** 2 / (2 * 9.80665))
+
+
+def test_cavitation_triggers_at_five_completed_minutes_exactly():
+    minutes, assets = cavitation_fixture([-75] * 20)
+    assert cavitation_detect(minutes.iloc[:4], assets).empty
+    result = cavitation_detect(minutes, assets)
+    assert len(result) == 1
+    row = result.iloc[0]
+    assert pd.Timestamp(row.alert_time_utc) == START + pd.Timedelta(minutes=5)
+    assert (row.event_class, row.fault_type, row.decided_by) == ("MACHINE", "CAVITATION", "source_cavitation")
+    assert "low margin for 5.0 min" in row.evidence
+    assert "speed unavailable" in row.evidence and "flow unavailable" in row.evidence
+    assert "required-NPSH dependence on flow unknown" in row.evidence
+    assert "one physical context, n = 1 pump" in row.evidence
+    assert "this matches the simulator's model; on real equipment the margin needs site verification" in row.evidence
+
+
+@pytest.mark.parametrize("missing", ["installed", "mean", "count"])
+def test_cavitation_missing_suction_channel_disables_rule(missing):
+    minutes, assets = cavitation_fixture([-75] * 10)
+    if missing == "installed":
+        assets["channels_available"] = "fluid_temp_c"
+    else:
+        minutes = minutes.drop(columns=["suction_pressure_kpa__" + missing])
+    assert cavitation_detect(minutes, assets).empty
+
+
+def test_cavitation_no_t0_alert_even_with_inconsistent_extra_columns():
+    minutes, assets = cavitation_fixture([-75] * 10)
+    assets["instrumentation_tier"] = "T0_LEGACY"
+    assert cavitation_detect(minutes, assets).empty
+
+
+def test_cavitation_recovers_and_rearms_for_distinct_episodes():
+    minutes, assets = cavitation_fixture([-75] * 5 + [0] + [-75] * 10)
+    result = cavitation_detect(minutes, assets)
+    assert pd.to_datetime(result.alert_time_utc, utc=True).tolist() == [
+        START + pd.Timedelta(minutes=5), START + pd.Timedelta(minutes=11),
+    ]
+
+
+def test_clogging_cannot_suppress_cavitation_but_prior_same_episode_can():
+    minutes, assets = cavitation_fixture([-75] * 10)
+    assert len(cavitation_detect(minutes, assets, existing((3,), fault="SUCTION_STRAINER_CLOGGING"))) == 1
+    assert cavitation_detect(minutes, assets, existing((3,), fault="CAVITATION")).empty
+    assert len(cavitation_detect(minutes, assets, existing((6,), fault="CAVITATION"))) == 1
+
+
+@pytest.mark.parametrize("interruption", ["stop", "quality", "missing", "gap"])
+def test_cavitation_requires_continuous_valid_running_minutes(interruption):
+    minutes, assets = cavitation_fixture([-75] * 12)
+    if interruption == "stop":
+        minutes.loc[3, ["operating_mode", "steady"]] = ["STOPPED", False]
+    elif interruption == "quality":
+        minutes.loc[3, "quality_any"] = 1.0
+    elif interruption == "missing":
+        minutes.loc[3, "fluid_temp_c__mean"] = np.nan
+    else:
+        minutes = minutes.drop(index=3)
+    result = cavitation_detect(minutes, assets)
+    assert len(result) == 1
+    assert pd.Timestamp(result.iloc[0].alert_time_utc) == START + pd.Timedelta(minutes=9)
+
+
+def test_cavitation_gap_or_stop_does_not_rearm_without_margin_recovery():
+    minutes, assets = cavitation_fixture([-75] * 20)
+    minutes.loc[7, ["operating_mode", "steady"]] = ["STOPPED", False]
+    minutes.loc[12, "fluid_temp_c__mean"] = np.nan
+    assert len(cavitation_detect(minutes, assets)) == 1
+
+
+def test_cavitation_speed_squared_scaling_uses_measured_speed():
+    minutes, assets = cavitation_fixture([-45] * 5)
+    assert cavitation_detect(minutes, assets).empty
+    minutes["motor_speed_rpm__mean"] = 2400.0
+    minutes["motor_speed_rpm__count"] = 60.0
+    assets["channels_available"] += "|motor_speed_rpm"
+    result = cavitation_detect(minutes, assets)
+    assert len(result) == 1
+    assert "speed=2400 rpm, speed-squared scaled" in result.iloc[0].evidence
+
+
+@pytest.mark.parametrize("fresh", [True, False])
+def test_cavitation_acceleration_is_optional_fresh_causal_confirmation(fresh):
+    minutes, assets = cavitation_fixture([0] * 15 + [-75] * 5)
+    assets["channels_available"] += "|vibration_accel_rms_g"
+    assets["wireless_update_s"] = 300
+    minutes["vibration_accel_rms_g__mean"] = np.nan
+    minutes["vibration_accel_rms_g__count"] = 0.0
+    minutes.loc[[4, 9, 14], ["vibration_accel_rms_g__mean", "vibration_accel_rms_g__count"]] = [0.1, 1.0]
+    if fresh:
+        minutes.loc[19, ["vibration_accel_rms_g__mean", "vibration_accel_rms_g__count"]] = [0.3, 1.0]
+    result = cavitation_detect(minutes, assets)
+    assert len(result) == 1
+    assert pd.Timestamp(result.iloc[0].alert_time_utc) == START + pd.Timedelta(minutes=20)
+    assert ("(increasing)" if fresh else "no fresh update; emitted without waiting") in result.iloc[0].evidence
+
+
+def test_cavitation_future_rows_and_future_official_decisions_cannot_change_prefix():
+    minutes, assets = cavitation_fixture([-75] * 15)
+    cut = START + pd.Timedelta(minutes=5)
+    complete = cavitation_detect(minutes, assets)
+    changed = minutes.copy()
+    changed.loc[changed.window_start_utc + AVAILABILITY["features_1min.parquet"].latency > cut,
+                ["suction_pressure_kpa__mean", "fluid_temp_c__mean", "quality_any"]] = [500, 120, 2.0]
+    changed_full = cavitation_detect(changed, assets)
+    assert_frame_equal(changed_full.loc[pd.to_datetime(changed_full.alert_time_utc, utc=True) <= cut],
+                       complete, check_exact=True)
+    assert_frame_equal(cavitation_detect(changed, assets, until=cut), complete, check_exact=True)
+    assert_frame_equal(cavitation_detect(minutes, assets, existing((6,), fault="CAVITATION"), until=cut),
+                       complete, check_exact=True)
+    assert_frame_equal(cavitation_detect(minutes, assets, until=cut - pd.Timedelta(seconds=1)),
+                       complete.iloc[:0], check_exact=True)
+
+
+def test_cavitation_provenance_is_dropped_before_csv(tmp_path):
+    minutes, assets = cavitation_fixture([-75] * 5)
+    result = apply_guarantees(cavitation_detect(minutes, assets), minutes, assets)
+    assert list(result.columns) == COLUMNS
+    destination = tmp_path / "cavitation.csv"
+    write_predictions(result, destination)
+    assert pd.read_csv(destination).columns.tolist() == COLUMNS
+    assert "decided_by" not in destination.read_text()
