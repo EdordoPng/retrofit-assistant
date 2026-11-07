@@ -268,3 +268,104 @@ def test_header_shows_readable_instrumentation(sample):
     html = (sample / 'out/A.html').read_text()
     assert 'Instrumentation: Legacy (T0)' in html
     assert '<small>Split: train</small>' in html and 'Tier:' not in html
+
+
+@pytest.fixture
+def history_report(sample):
+    def render(rows, until=None):
+        import re
+
+        assets = pd.read_csv(sample / 'assets.csv')
+        assets['window_end_utc'] = '2026-01-03T00:00:00Z'
+        assets.to_csv(sample / 'assets.csv', index=False)
+        pd.DataFrame(rows, columns=COLUMNS).to_csv(sample / 'predictions.csv', index=False)
+        args = ['report', '--asset', 'A', '--data', str(sample),
+                '--predictions', str(sample / 'predictions.csv'), '--out', str(sample / 'out')]
+        if until is not None:
+            args.extend(['--until', until])
+        assert main(args) == 0
+        suffix = f'_{pd.Timestamp(until).strftime("%Y%m%dT%H%MZ")}' if until else ''
+        html = (sample / f'out/A{suffix}.html').read_text()
+        return html, re.findall(r'<article class="alert">(.*?)</article>', html)
+
+    return render
+
+
+@pytest.mark.parametrize('event_class,fault_type', [('MACHINE', 'CAVITATION'), ('SENSOR', 'BEARING_WEAR')])
+def test_diagnosis_changed_from_previous_alert(history_report, event_class, fault_type):
+    _, cards = history_report([
+        ['A', '2026-01-01T00:01:00Z', 'MACHINE', 'BEARING_WEAR', .9375, 'first', 'Inspect'],
+        ['A', '2026-01-01T03:01:00Z', event_class, fault_type, .5, 'second', 'Review'],
+    ])
+    assert len(cards) == 2
+    assert 'Previous alerts on this pump within 12 h' not in cards[0]
+    assert 'Diagnosis changed from' not in cards[0]
+    assert 'Diagnosis changed from:</strong> MACHINE/BEARING_WEAR' in cards[1]
+    assert 'Previous alerts on this pump within 12 h:</strong> 01 Jan 2026, 00:01 UTC MACHINE/BEARING_WEAR (high)' in cards[1]
+    assert cards[1].index('Diagnosis changed from') < cards[1].index('Time (UTC)')
+    assert cards[1].index('Previous alerts on this pump within 12 h') < cards[1].index('Time (UTC)')
+
+
+def test_same_diagnosis_has_history_despite_different_evidence_channels(history_report):
+    html, cards = history_report([
+        ['A', '2026-01-01T00:01:00Z', 'MACHINE', 'UNKNOWN', .617647, 'full: fluid_temp_c z=2', 'Inspect'],
+        ['A', '2026-01-01T03:01:00Z', 'MACHINE', 'UNKNOWN', .5, 'full: vibration_crest_factor z=3', 'Review'],
+    ])
+    assert 'Diagnosis changed from' not in html
+    assert 'Previous alerts on this pump within 12 h' in cards[1]
+    assert '01 Jan 2026, 00:01 UTC MACHINE/UNKNOWN (medium)' in cards[1]
+
+
+@pytest.mark.parametrize('second_time,has_history', [
+    ('2026-01-01T12:01:00Z', True),
+    ('2026-01-01T12:01:01Z', False),
+    ('2026-01-01T00:01:00Z', False),
+])
+def test_previous_alert_time_boundaries(history_report, second_time, has_history):
+    _, cards = history_report([
+        ['A', '2026-01-01T00:01:00Z', 'MACHINE', 'BEARING_WEAR', .5, 'first', 'Inspect'],
+        ['A', second_time, 'SENSOR', 'UNKNOWN', .5, 'second', 'Review'],
+    ])
+    assert ('Previous alerts on this pump within 12 h' in cards[1]) == has_history
+    assert ('Diagnosis changed from' in cards[1]) == has_history
+    if has_history:
+        assert '01 Jan 2026, 00:01 UTC MACHINE/BEARING_WEAR (-)' in cards[1]
+
+
+def test_history_is_ordered_and_compares_most_recent_alert_on_same_pump(history_report):
+    _, cards = history_report([
+        ['A', '2026-01-01T03:01:00Z', 'MACHINE', 'BEARING_WEAR', .5, 'third', 'Review'],
+        ['A', '2026-01-01T01:01:00Z', 'MACHINE', 'BEARING_WEAR', .2, 'second', 'Inspect'],
+        ['B', '2026-01-01T02:01:00Z', 'SENSOR', 'UNKNOWN', .5, 'other pump', 'Review'],
+        ['A', '2026-01-01T00:01:00Z', 'SENSOR', 'UNKNOWN', .2, 'first', 'Inspect'],
+    ])
+    last = next(card for card in cards if '<h4>Alert 3</h4>' in card)
+    assert 'Diagnosis changed from' not in last
+    first = '01 Jan 2026, 00:01 UTC SENSOR/UNKNOWN (low)'
+    second = '01 Jan 2026, 01:01 UTC MACHINE/BEARING_WEAR (low)'
+    assert first + '; ' + second in last
+    assert '02:01 UTC' not in last
+
+
+@pytest.mark.parametrize('until,expected_cards', [
+    ('2026-01-01T00:00:30Z', 0),
+    ('2026-01-01T01:01:00Z', 1),
+])
+def test_until_history_uses_only_visible_alerts(history_report, until, expected_cards):
+    html, cards = history_report([
+        ['A', '2026-01-01T00:01:00Z', 'MACHINE', 'BEARING_WEAR', .2, 'first', 'Inspect'],
+        ['A', '2026-01-01T03:01:00Z', 'SENSOR', 'UNKNOWN', .5, 'second', 'Review'],
+    ], until=until)
+    assert len(cards) == expected_cards
+    assert 'Previous alerts on this pump within 12 h' not in html
+    assert 'Diagnosis changed from' not in html
+
+
+def test_history_and_previous_diagnosis_are_html_escaped(history_report):
+    html, cards = history_report([
+        ['A', '2026-01-01T00:01:00Z', '<class>', '"type"&', .2, 'first', 'Inspect'],
+        ['A', '2026-01-01T03:01:00Z', 'SENSOR', 'UNKNOWN', .5, 'second', 'Review'],
+    ])
+    assert '<class>' not in html
+    assert 'Diagnosis changed from:</strong> &lt;class&gt;/&quot;type&quot;&amp;' in cards[1]
+    assert '01 Jan 2026, 00:01 UTC &lt;class&gt;/&quot;type&quot;&amp; (low)' in cards[1]

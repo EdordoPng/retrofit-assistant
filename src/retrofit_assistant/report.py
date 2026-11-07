@@ -182,10 +182,20 @@ def generate(asset, data, predictions, out, until=None):
         first, last = group[0], group[-1]
         items = []
         for row in group:
-            fields = (('Time (UTC)', _time(row['_time'])), ('Class', row.event_class),
+            earlier = alerts.loc[(alerts['_time'] < row['_time'])
+                                 & (alerts['_time'] >= row['_time'] - pd.Timedelta(hours=12))]
+            fields = []
+            if not earlier.empty:
+                previous = earlier.iloc[-1]
+                if (previous.event_class, previous.fault_type) != (row.event_class, row.fault_type):
+                    fields.append(('Diagnosis changed from', f'{previous.event_class}/{previous.fault_type}'))
+                history = [f"{_time(alert['_time'])} {alert.event_class}/{alert.fault_type} "
+                           f"({evidence_level(alert.confidence) or '-'})" for _, alert in earlier.iterrows()]
+                fields.append(('Previous alerts on this pump within 12 h', '; '.join(history)))
+            fields.extend((('Time (UTC)', _time(row['_time'])), ('Class', row.event_class),
                       ('Fault type', row.fault_type), ('Confidence', _confidence(row.confidence)),
                       ('Deviating signal', deviating_signal(row.evidence)), ('Evidence', row.evidence),
-                      ('Recommended action', row.recommended_action))
+                      ('Recommended action', row.recommended_action)))
             items.append('<article class="alert"><time datetime="' + esc(row.alert_time_utc) + '"></time><h4>Alert ' + str(row['_number']) + '</h4>' + ''.join(
                 f'<p><strong>{esc(label)}:</strong> {esc(value)}</p>' for label, value in fields) + '</article>')
         cards.append(f'<section class="condition"><h3>C{index}: {esc(_condition_title(first))}</h3>'
