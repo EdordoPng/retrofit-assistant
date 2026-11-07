@@ -253,3 +253,81 @@ Consequences:
 ## Amendment 2026-11-07, warm-up
 
 Accepted by the owner. Decision 1 has no warm-up phase: `causal_b1` has no physical or generic limits and is frozen as it stands, because first-day measurements gave 1 false-alert episode, 8 of 9 early events detected, and absolute checks stay in P2-2.
+
+## Amendment 2026-11-07, direction review
+
+Accepted by the owner after an oracle review (read only) and a reading of the official challenge
+text. Where this section differs from the text above, this section prevails.
+
+Reason: the official text puts actionable alerts and guidance for the person who works on the
+machine at the centre (criterion A, 25 %). It asks for measured detection quality and warning lead
+time against a simple baseline (B, 25 %). It asks for false alarms, missing sensors, uncertainty
+and safe human review (C, 20 %), and for plausible retrofit cost, edge or on-site operation and
+adaptation to another machine class (D, 20 %). The remaining plan spent too much on the detector
+and too little on this evidence. The composite score is evidence for B only.
+
+Cut, and kept in the technical note as a roadmap:
+- Decision 8, watch state (P1-5, C11). A preliminary train measurement with the current diagnosis
+  gave losses at every hold tried: holds of 1, 3, 6 and 12 h cost 2.7 to 7.5 composite points
+  against 59.797, and lost 1 to 3 detections.
+- Decision 4, duty and inlet normalisation with CUSUM or slope on residuals (P2-1).
+- Decision 5, pump-curve, affinity and T0 absolute checks (P2-2).
+- Decision 7, snapshot spectra for BPFO, 1x and 2x (P2-3).
+
+Kept, with these changes:
+- P1-3b adds dedicated alert sources, SENSOR_STUCK first and CAVITATION second, each with a
+  60-minute time-box. The cavitation rule compares NPSH available, computed from measured suction
+  pressure and the vapour pressure at fluid temperature (standard hydraulics), with the nameplate
+  `npsh3_at_bep_m` in `assets.csv`. It is never fitted on PUMP-06. This matches the simulator's
+  model; on real equipment the margin needs site verification. Its false alerts are measured on
+  every train pump. It is stated as a rule with one physical context, n = 1 pump. It is cut
+  without discussion if it exceeds its time-box.
+- The rule that decided each alert travels in an internal column, `decided_by`. It is never kept
+  in DataFrame attributes and never written to the CSV.
+- P1-4 becomes repair guidance by type and class. Each alert carries readable evidence, what to
+  inspect, what to do and what to rule out before intervening. For SENSOR alerts, verify the
+  instrument before opening the pump. Templates are deterministic and tied to the rule in
+  `decided_by`. They replace generic actions on process variables, such as UNKNOWN on
+  `fluid_temp_c` with "Inspect pump.". P1-4 adds no new diagnostic signature.
+- Decision 10 is reduced (P1-6): benign operating context is shown as evidence on the alert card,
+  with no hold and no suppression.
+- Decision 13 moves earlier (P3-1): the tier ablation reports composite score and lead time, on
+  every T2 pump if time allows.
+- Decision 11 (P3-2): confidence is an evidence level. Its runtime value is the level's hit rate on
+  train, looked up from a table in code. Validation is reported separately as a check and never
+  changes the table. It is never presented as a calibrated probability. It replaces the confidence
+  after re-diagnosis, so it changes the contract "rediagnose changes class, type, evidence and
+  action only" and the confidence assertion in `tests/test_output.py`.
+
+Fault types named after the cuts:
+- By our own rules: SENSOR_STUCK and CAVITATION (P1-3b sources), SENSOR_DRIFT and
+  SENSOR_CALIBRATION_SHIFT (re-diagnosis shape), SENSOR_NOISE_SPIKES (re-diagnosis noise check),
+  and UNKNOWN (refuted, accelerometer-only or ambiguous cases).
+- Only by the official B1 rules: COMMUNICATION_LOSS, BEARING_WEAR, SUCTION_STRAINER_CLOGGING,
+  DISCHARGE_RESTRICTION, MISALIGNMENT, IMBALANCE and IMPELLER_WEAR. SENSOR_STUCK and CAVITATION
+  can also come from the official rules.
+- Not covered: AIR_ENTRAINMENT. No rule names it.
+
+New deliverables required by the official text:
+- A short presentation, also as PDF.
+- A technical note covering retrofit costs, deployment assumptions, safety and limits, including
+  the fault types above. It also covers transfer to another class of rotating machine, as a table
+  of component, transfers or must be reconfigured, and limit. It includes an edge measurement of
+  `predict` wall time and peak memory per pump on this PC.
+- A short narrated demo video.
+
+Only if there is margin: one what-if scene in the simulator, with an operating action tried in
+simulation only, never on equipment. Out: an OPC UA or MQTT adapter and a natural-language
+interface. They are described only as an integration path.
+
+Cut order, which replaces the one above: CAVITATION first, then P1-6, then the ablation reduced to
+one T2 pump. Never cut: P1-4, P3-2, the technical note, the presentation and the test CSV.
+
+Claims to avoid in all material: "+7.3 from diagnosis" (part of it is the scorer's matching),
+"accuracy", "calibrated probabilities", "works on any machine", "failures prevented".
+
+Consequences:
+- The detector stays `causal_b1` candidates plus re-diagnosis plus two dedicated sources. Slow
+  faults and pre-existing wear keep the limits measured on train, and the note reports them.
+- IMBALANCE and MISALIGNMENT are still named only by the official rules, since spectra are cut.
+- Effort moves to guidance, measured uncertainty, tier value and the written case for retrofit.

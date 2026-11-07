@@ -191,54 +191,32 @@ Data integrity is the main risk.
   (P2-1, P2-2).
 
 ## Tasks
-Durations are estimates. The first end-to-end, data to causal B1 to CSV to score, closes with P0-5.
+Durations are time-boxes. Each task has at most two implementation rounds. Done before the direction
+review: P0-1 to P0-6, P1-1, P1-2, P1-3, P1-7, and P1-7b (report layout). Their rows are in Git at
+`eb335a0`.
 
-### P0 (Sat 07:30-12:00)
+Order of changes to `pipeline.py`: P1-3b, then the guidance hook in P1-8, then `mask_tier` in P3-1,
+then the context hook of P1-6 after P3-1 is merged, then confidence in P3-2. All of them act before
+`apply_guarantees`, which keeps only the seven CSV columns and so drops `decided_by`. The final
+order is candidates, re-diagnosis, sources, guidance, context, confidence, then guarantees.
+
 | # | Task | Files | Min | Done when | Criteria | Depends on |
 | --- | --- | --- | --- | --- | --- | --- |
-| P0-1 | Scaffold, setuptools pin covering both declared backends, reproducible editable installs, smoke gate | `requirements-lock.txt`, `pyproject.toml`, `src/retrofit_assistant/__init__.py`, `__main__.py`, `cli.py`, `tests/test_smoke.py` | 25 | `python -m retrofit_assistant --help` exits 0 and the smoke gate passes | C18 | - |
-| P0-2 | Loader with availability contract | `data.py`, `tests/test_boundaries.py` | 30 | Boundary tests pass | C3, C4 | P0-1 |
-| P0-3 | Hourly `causal_b1` | `baseline.py`, `detectors.py`, `params.py`, `tests/test_causal_b1.py` | 45 | Hand-calculated prefix and equality with B1 from t0 + 24 h both pass | C2 | P0-2 |
-| P0-4 | Minimal policy and scorer fixtures | `policy.py`, `params.py`, `tests/test_policy.py` | 35 | Policy tests pass | C7 | P0-3 |
-| P0-5 | Pipeline, writer, validator, first safety CSV: **first end-to-end** | `pipeline.py`, `output.py`, `cli.py`, `tests/test_output.py` | 25 | Official scorer accepts `causal_b1` and `full` on train and validation, scores are recorded, safety CSV passes unopened | C5, C6 | P0-4 |
-| P0-6 | Truncation test, regenerate safety CSV | `tests/test_causality.py` | 45 | Green on PUMP-01..09, C6 passes again, and false-alert episodes in the first 24 h are reported, summed over PUMP-01..07. At 3 or more, the P1-1 warm-up limits become mandatory | C1, C6 | P0-5 |
-
-Margin: 65 minutes.
-
-### P1 (Sat 12:00-16:00)
-| # | Task | Files | Min | Done when | Criteria | Depends on |
-| --- | --- | --- | --- | --- | --- | --- |
-| P1-1 | Warm-up limits, freeze `causal_b1` | `detectors.py`, `params.py`, `tests/test_causal_b1.py` | 30 | Warm-up tests and C1 pass, reference scores recorded | C1, C2 | P0-6 |
-| P1-2 | `compare` automation | `evaluate.py`, `cli.py` | 20 | Table written for both splits | C8 | P1-1 |
-| P1-3 | Sensor vs machine, step vs ramp, SENSOR_DRIFT, re-diagnosis at fixed times | `consistency.py`, `diagnosis.py`, `detectors.py`, `pipeline.py`, `params.py`, `tests/test_diagnosis.py`, `tests/test_causality.py` | 60 | Sensor cases pass, and gain and losses per event are recorded | C1, C10 | P1-2 |
-| P1-3b | Dedicated `full` alert sources: SENSOR_STUCK (dense and wireless), then CAVITATION | to be listed in its brief, plus `tests/test_causality.py` | 60 | False alerts measured on all train pumps, C9 measured separately, cavitation stated as one physical context | C1, C10 | P1-3 |
-| P1-4 | Machine signature diagnosis, AIR_ENTRAINMENT, evidence and action templates | `diagnosis.py`, `tests/test_diagnosis.py` | 45 | All signature cases pass | C1, C10 | P1-3b |
-| P1-5 | Watch state with family budgets fitted on train | `watch.py`, `params.py`, `evaluate.py`, `tests/test_watch.py` | 45 | Watch tests pass, compound-event loss recorded | C1, C11 | P1-4 |
-| P1-6 | Operating context contract, benign hold and re-check | `data.py`, `context.py`, `watch.py`, `tests/test_watch.py` | 20 | Benign cases pass | C1, C3, C11 | P1-5 |
-| P1-7 | Static HTML report | `report.py`, `cli.py`, `tests/test_report.py` | 45 | Report generated for PUMP-08 | C14 | P1-2 |
-| P1-8 | Milestone | - | 15 | C8 table updated, C6 passes | C6, C8 | P1-6, P1-7 |
-
-### P2 (Sat 16:00-20:00)
-| # | Task | Files | Min | Done when | Criteria | Depends on |
-| --- | --- | --- | --- | --- | --- | --- |
-| P2-1 | Duty and inlet normalisation, CUSUM or slope on residuals | `residuals.py`, `pipeline.py`, `tests/test_physics.py` | 45 | Train and validation not worse than P1 | C1, C8 | P1-8 |
-| P2-2 | Pump-curve and affinity checks by channels, T0 absolute check | `physics.py`, `diagnosis.py`, `tests/test_physics.py` | 45 | Tier cases pass | C1, C12 | P2-1 |
-| P2-3 | Snapshot contract, BPFO, 1x and 2x spectra in diagnosis | `spectra.py`, `data.py`, `diagnosis.py`, `tests/test_spectra.py` | 45 | Synthetic tones recovered | C1, C3, C13 | P2-2 |
-| P2-4 | Milestone | - | 15 | C8 table updated, C6 passes | C6, C8 | P2-3 |
-
-### P3 (Sat 20:00-23:00)
-| # | Task | Files | Min | Done when | Criteria | Depends on |
-| --- | --- | --- | --- | --- | --- | --- |
-| P3-1 | Ablation by channel masking | `ablation.py`, `cli.py`, `pipeline.py` | 45 | Per-tier table written | C15 | P2-4 |
-| P3-2 | Confidence levels and hit rates | `confidence.py`, `evaluate.py`, `tests/test_confidence.py` | 30 | Levels carry hit rate and n | C1, C16 | P2-4 |
-| P3-3 | Freeze gate, truncation on test assets, official tests once, milestone | - | 25 | Gate exits 0 or the shortfall is reported to the owner, and C19 passes | C1, C6, C9, C17, C19 | P3-1, P3-2 |
-
-### Wrap-up (Sat 23:00-Sun 01:00)
-| # | Task | Files | Min | Done when | Criteria | Depends on |
-| --- | --- | --- | --- | --- | --- | --- |
-| W-1 | README, business case from measured early warning | `README.md` | 45 | Setup and all commands reproduced | C17 | P3-3 |
-| W-2 | Architecture document with diagram | `ARCHITECTURE.md` | 30 | Matches the final modules | C17 | P3-3 |
-| W-3 | Final run and reproducibility check | - | 20 | C6 and C17 pass | C6, C17 | W-1, W-2 |
+| P1-3b-1 | SENSOR_STUCK source, dense and wireless, and the internal column `decided_by` | `sources.py`, `diagnosis.py`, `pipeline.py`, `params.py`, `tests/test_sources.py`, `tests/test_diagnosis.py`, `tests/test_causality.py` | 60 | Sources tests and C1 pass, new false alerts per train pump reported, C9 measured against `full` after P1-3 | C1, C10, C20 | P1-3 |
+| P1-3b-2 | CAVITATION source from the NPSH margin | same as P1-3b-1 | 60 | As P1-3b-1, rule stated with n = 1 pump; cut if over the time-box | C1, C20 | P1-3b-1 |
+| P1-4 | Repair guidance templates | `recommendations.py`, `tests/test_recommendations.py` | 75 | Guidance tests pass; module not yet called by the pipeline | C11 | P1-3 |
+| P1-8 | Milestone: guidance hook, CSV columns test, lead time in compare, gate, safety CSV | `pipeline.py` (hook), `evaluate.py`, `consistency.py` (docstring of `coupled_channels` only), `tests/test_evaluate.py`, `tests/test_output.py` | 30 | C1 complete green, CSV columns equal the template, table with lead time, gate result recorded, safety CSV checked | C1, C6, C8, C9 | P1-3b, P1-4 |
+| P1-6 | Benign context as evidence | `data.py`, `context.py`, `tests/test_context.py`, `tests/test_boundaries.py`; hook in `pipeline.py` by the supervisor after P3-1 | 30 | Context tests pass, hook merged | C1, C3, C21 | P1-8 |
+| P3-1 | Tier ablation with score and lead time | `ablation.py`, `cli.py`, `pipeline.py` (`mask_tier`), `tests/test_ablation.py` | 60 | Table per tier written | C15 | P1-8 |
+| P3-2 | Evidence-level confidence | `confidence.py`, `evaluate.py`, `pipeline.py`, `report.py`, `tests/test_confidence.py`, `tests/test_output.py` | 60 | Levels carry train and validation hit rates, type-correct shares and n; "(provisional)" removed from the report | C1, C16 | P3-1, P1-6 |
+| P3-4 | Edge measurement | - | 15 | Time and peak RSS recorded | C22 | P3-2 |
+| P3-5 | What-if scene, margin only | `build/` output only | 45 | One simulated action shown, never on equipment | - | P3-2 |
+| P3-3 | Freeze gate, truncation on test assets, official tests once, milestone | - | 40 | Gate result reported, C19 passes, safety CSV checked | C1, C6, C9, C17, C19 | P3-2 |
+| W-1 | README with all commands | `README.md` | 45 | Setup and commands reproduced | C17 | P3-3 |
+| W-2 | Technical note with architecture diagram | `docs/technical-note.md` | 105 | Draft before freeze, final after; matches the modules; limits list the fault types named only by official rules and AIR_ENTRAINMENT as not covered | C17, C22 | P3-2 |
+| W-3 | Presentation and PDF | `docs/presentation/` | 90 | Draft before freeze, final after | - | W-2 |
+| W-4 | Final run and reproducibility check | - | 20 | C6 and C17 pass | C6, C17 | W-1, W-2 |
+| W-5 | Narrated video | outside the repo | 90 | Recorded from the report and the commands | - | W-3 |
 
 ## Open questions
 
@@ -262,3 +240,18 @@ Margin: 65 minutes.
 - 2026-11-07, C1 with re-diagnosis and new sources: decided by the owner. From P1-3 the `full` comparison matches emitted rows to candidates by asset and time, because `rediagnose` changes other columns. From P1-3b every internal candidate carries a provenance that is not written to the CSV, and spacing applies to the merged candidate stream. In both cases, equality of emitted alerts up to the cut stays exact in every column. This entry prevails over the C1 comparison entry where they differ.
 - 2026-11-07, P0 assertions superseded by the diagnosis plan: decided by the owner. `test_compare_end_to_end` no longer requires `GATE FAIL`: the expected exit code and message follow from `gate()` on the composite values in the table, and 58.451 and 78.013 stay fixed for `causal_b1`. `test_run_detector_validation_pump08_and_until` no longer requires `full` to equal `causal_b1`: asset, alert time and confidence stay exactly equal, row counts match, and class and type stay in the vocabulary.
 - 2026-11-07, independent witnesses and noise check in P1-3: decided by the owner. The witnesses of a channel are its installed channels in the official `COUPLED` map, and they decide confirmed, refuted or not verifiable. The actuator channels `n` (`motor_speed_rpm`) and `vp` (`valve_position_pct`) are excluded as witnesses of any other channel, because in a closed loop they react to the measurement, and their fresh readings appear in the evidence only as context. `n` and `vp` have no entry in `COUPLED`, so when either is itself the deviating channel it has no witnesses: the state is not verifiable and the noise check cannot pass. `COUPLED_FOLLOW_RATIO` was measured and removed: at 0.25 it made 3 correct train alerts wrong, so the stillness limit stays k / 3. Here k is `B1_K` = 6.0, so k / 3 = 2.0 (`COUPLED_STILL_FRACTION` = 1/3); z is (minute mean - baseline median) / max(`MAD_SCALE` x baseline MAD, the channel floor in `Z_FLOORS`), and zs is (minute std - baseline median of std) / max(`MAD_SCALE` x MAD of std, `ZS_FLOOR_ABS` + `ZS_FLOOR_REL` x |baseline median of std|). `SENSOR_NOISE_SPIKES` no longer depends on the last minute. The noise window holds the minutes with `window_start_utc` in (last - `NOISE_RECENT_MIN`, last], with `NOISE_RECENT_MIN` = 10 and last the newest minute available at re-diagnosis, that is `window_start_utc` + 60 s <= alert time, so the window uses only minutes available at that time. A real observation is a minute with non-NaN `<channel>__mean`, `<channel>__count` > 0, no COMM_LOSS, STALE or BAD_SENSOR_STATUS flag in `quality_any`, and finite z and zs. `<channel>__count` is the number of valid samples in that minute. A candidate channel must be fresh at re-diagnosis, have an update interval of at most 60 s, so longer-interval wireless channels are excluded, and have at least `SHAPE_MIN_OBSERVATIONS` = 3 real observations with `<channel>__count` >= `NOISE_MIN_DENSE_COUNT` = 30 in the window, median zs above k and median |z| below k / 3. It needs at least one witness, and every installed independent witness must be fresh, have at least 3 real observations and have median |zs| below k / 3, with no count limit. Candidates are tried from the highest median zs, and the first that passes gives SENSOR / `SENSOR_NOISE_SPIKES`. If no candidate passes, the noise check changes nothing: the alert stays, and the three-state rule decides its diagnosis. COMMUNICATION_LOSS and SENSOR_STUCK alerts skip both the noise check and the three-state rule and stay unchanged. This entry prevails over the diagnosis plan entry where they differ.
+- 2026-11-07, direction review: decided by the owner, see ADR 0001 Amendment 2026-11-07, direction review. The watch state (P1-5), P2-1, P2-2 and P2-3 are cut, and `watch.py`, `residuals.py`, `physics.py` and `spectra.py` leave the Design list. `sources.py`, `recommendations.py`, `context.py`, `confidence.py` and `ablation.py` enter it. The Tasks section is replaced. The cut order is CAVITATION, then P1-6, then the ablation reduced to one T2 pump. P1-4, P3-2, the technical note, the presentation and the test CSV are never cut. An OPC UA or MQTT adapter and a natural-language interface stay out of scope, described only as an integration path.
+- 2026-11-07, requirements after the direction review: decided by the owner.
+  - R5 now reads: diagnosis separates sensor from machine faults. Our own rules name SENSOR_STUCK, CAVITATION, SENSOR_DRIFT, SENSOR_CALIBRATION_SHIFT, SENSOR_NOISE_SPIKES and UNKNOWN. COMMUNICATION_LOSS, BEARING_WEAR, SUCTION_STRAINER_CLOGGING, DISCHARGE_RESTRICTION, MISALIGNMENT, IMBALANCE and IMPELLER_WEAR are named only by the official B1 rules. AIR_ENTRAINMENT is not covered.
+  - R6 now reads: alert sources, guidance and context adapt to the channels each asset has. A check whose channels are missing is disabled with no error and no alert.
+  - New R10: the submission includes a technical note, a short presentation with a PDF and a narrated video. Every number in them comes from a recorded command output.
+- 2026-11-07, criteria after the direction review: decided by the owner. C12 and C13 are removed.
+  - C8 now also reports, for `full` and `causal_b1` on train and validation, `median_lead_time_h` and `early_warning_rate` from the official scorer. It reports the declared B1 median lead to deadline from `baselines/results/baseline_metrics.md`: 55.8 h on train and 8.3 h on validation. Verify is unchanged.
+  - C10 now reads: given synthetic minute frames, when re-diagnosis runs, then the confirmed, refuted and not verifiable states follow the diagnosis plan. A persistent step gives SENSOR_CALIBRATION_SHIFT, a ramp gives SENSOR_DRIFT, persistent isolated variance gives SENSOR_NOISE_SPIKES, and an ambiguous shape keeps an official SENSOR type. AIR_ENTRAINMENT is not required. Verify is unchanged.
+  - C11 is replaced (R5, R2): given every `fault_type` and `event_class` of the vocabulary and every value of `decided_by`, when guidance runs, then `recommended_action` names what to inspect, what to do and what to rule out, from a deterministic template. A SENSOR alert says to verify the instrument before opening the pump. An UNKNOWN alert on a process variable never says only "Inspect pump." No action writes to a device. Verify: `python -m pytest -q tests/test_recommendations.py`
+  - C15 now reads: given T2 assets with channels masked to T1 and T0, when ablation runs, then a table reports composite score and median lead time per tier, on PUMP-02, PUMP-04, PUMP-07 and PUMP-09. It may be reduced to one T2 pump under the cut order. Verify is unchanged.
+  - C16 now reads: given train and validation alerts, when confidence levels are built, then each level comes from the evidence rule in `decided_by`. A hit is an alert inside the window of a scored event. Each level reports its hit rate, the share of alerts with the correct `fault_type` and the sample size, on train and on validation separately. The runtime confidence of a level is its train hit rate, looked up from a table in code. Validation is a check only and never changes the table. No test data is used, and reports and documents never call it a probability. Verify is unchanged.
+  - New C20 (R5, R6): given synthetic minute frames, when the sources run, then SENSOR_STUCK is found on dense channels and on 300 s wireless channels, counting real updates and not minutes, and normal quantisation is not stuck. CAVITATION compares NPSH available, computed from measured suction pressure and the vapour pressure at fluid temperature, with the nameplate `npsh3_at_bep_m`. This matches the simulator's model; on real equipment the margin needs site verification. There is no cavitation alert on T0 and one alert per episode. Alerts up to t do not change when rows after t change. Verify: `python -m pytest -q tests/test_sources.py`
+  - New C21 (R2, R6): given operating context, when context runs, then benign context available by the alert time appears in the evidence. It never holds, suppresses or delays an alert. `operating_context.csv` is read only through `data.py`, with its availability rule. Verify: `python -m pytest -q tests/test_context.py && python -m pytest -q tests/test_boundaries.py -k runtime_inputs`
+  - New C22 (R10): given one train pump and one validation pump, when `predict` runs in a fresh process, then wall time and peak RSS are recorded in the technical note with the command used. No test asset is used for this measurement.
+- 2026-11-07, provenance and confidence contract: decided by the owner. The rule that decided each alert is the internal column `decided_by`, never DataFrame attributes. `rediagnose` sets it for `causal_b1` candidates, and the sources set it for their own. `apply_guarantees` keeps only the seven CSV columns, so `decided_by` never reaches the writer, and a test requires the CSV columns to equal `submission_template/predictions_template.csv`. From P3-2 the pipeline assigns `confidence` after re-diagnosis, so `rediagnose` still changes only class, type, evidence, action and `decided_by`, while `confidence` is set by `confidence.py`. `test_run_detector_validation_pump08_and_until` then keeps exact equality on `asset_id` and `alert_time_utc` only, with confidence finite in [0, 1]. This entry prevails over the diagnosis plan entry and the C1 with re-diagnosis and new sources entry where they differ.
