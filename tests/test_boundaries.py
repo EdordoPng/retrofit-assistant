@@ -15,7 +15,7 @@ from retrofit_assistant.data import AVAILABILITY, InputContract, _read_input, lo
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "src" / "retrofit_assistant"
 DATA = ROOT / "challenge" / "RETROFIT_AI_PARTICIPANTS_2026" / "data" / "full"
-DEVELOPMENT = {"evaluate", "ablation", "report"}
+DEVELOPMENT = {"evaluate", "ablation", "report", "pump_table"}
 READERS = {"read_csv", "read_parquet", "read_table", "ParquetFile", "open"}
 SIM_EXPORTS = {"regime_frame", "b1_threshold", "CH", "COUPLED"}
 BLOCKED_IMPORTS = {
