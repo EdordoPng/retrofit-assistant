@@ -16,7 +16,7 @@ from .params import (
     CAVITATION_ANTOINE_K_RANGE, CAVITATION_ATMOSPHERE_KPA,
     CAVITATION_GRAVITY_M_S2, CAVITATION_MIN_MIN, CAVITATION_NPSH_MARGIN,
     CAVITATION_SUCTION_VELOCITY_BEP_M_S, CAVITATION_WATER_DENSITY_KG_M3,
-    STUCK_BOUNDS, STUCK_MIN_MIN, STUCK_MIN_UPDATES,
+    STOP_MODES, STUCK_BOUNDS, STUCK_MIN_MIN, STUCK_MIN_UPDATES,
 )
 
 INTERNAL_COLUMNS = [*COLUMNS, "decided_by"]
@@ -206,6 +206,7 @@ def cavitation_candidates(minutes, assets, existing, until=None):
         prior_times = pd.DatetimeIndex(pd.to_datetime(prior.alert_time_utc, utc=True)).sort_values()
         acceleration = deque()
         cadence = update_interval(metadata, "a")
+        stopped = group.operating_mode.isin(STOP_MODES).to_numpy(dtype=bool)
         low_start, episode_start, previous_row, latched = None, None, None, False
         for position, row_time in enumerate(group.window_start_utc):
             decision_time = pd.Timestamp(row_time) + latency
@@ -215,6 +216,9 @@ def cavitation_candidates(minutes, assets, existing, until=None):
                 low_start = None
             while acceleration and acceleration[0][0] < decision_time - pd.Timedelta(hours=BASELINE_HOURS):
                 acceleration.popleft()
+            if stopped[position]:
+                low_start, episode_start, latched = None, None, False
+                continue
             if not eligible[position] or quality[position] & 15:
                 low_start = None
                 continue

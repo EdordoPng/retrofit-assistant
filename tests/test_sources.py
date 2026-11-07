@@ -321,11 +321,75 @@ def test_cavitation_requires_continuous_valid_running_minutes(interruption):
     assert pd.Timestamp(result.iloc[0].alert_time_utc) == START + pd.Timedelta(minutes=9)
 
 
-def test_cavitation_gap_or_stop_does_not_rearm_without_margin_recovery():
+def test_cavitation_gap_or_missing_does_not_rearm_without_margin_recovery():
     minutes, assets = cavitation_fixture([-75] * 20)
-    minutes.loc[7, ["operating_mode", "steady"]] = ["STOPPED", False]
+    minutes = minutes.drop(index=7)
     minutes.loc[12, "fluid_temp_c__mean"] = np.nan
     assert len(cavitation_detect(minutes, assets)) == 1
+
+
+@pytest.mark.parametrize("mode", ["STOPPED", "LOCKED_OUT"])
+def test_cavitation_explicit_stop_rearms_with_five_completed_minutes_after_restart(mode):
+    minutes, assets = cavitation_fixture([-75] * 25)
+    minutes.loc[7:9, ["operating_mode", "steady"]] = [mode, False]
+    result = cavitation_detect(minutes, assets)
+    assert pd.to_datetime(result.alert_time_utc, utc=True).tolist() == [
+        START + pd.Timedelta(minutes=5), START + pd.Timedelta(minutes=15),
+    ]
+    assert len(cavitation_detect(minutes, assets, until=START + pd.Timedelta(minutes=14))) == 1
+    # A decision from the closed episode cannot suppress the restarted one.
+    restarted = cavitation_detect(minutes, assets, existing((3,), fault="CAVITATION"))
+    assert pd.to_datetime(restarted.alert_time_utc, utc=True).tolist() == [
+        START + pd.Timedelta(minutes=15),
+    ]
+
+
+def test_cavitation_absent_stop_rows_do_not_rearm_low_margin_episode():
+    minutes, assets = cavitation_fixture([-75] * 25)
+    minutes = minutes.drop(index=range(7, 10))
+    result = cavitation_detect(minutes, assets)
+    assert pd.to_datetime(result.alert_time_utc, utc=True).tolist() == [
+        START + pd.Timedelta(minutes=5),
+    ]
+
+
+@pytest.mark.parametrize("interruption", ["quality", "nan", "zero_count", "STARTING", "STOPPING", "unsteady"])
+def test_cavitation_non_stop_interruption_does_not_rearm_low_margin_episode(interruption):
+    minutes, assets = cavitation_fixture([-75] * 25)
+    if interruption == "quality":
+        minutes.loc[7, "quality_any"] = 1.0
+    elif interruption == "nan":
+        minutes.loc[7, "fluid_temp_c__mean"] = np.nan
+    elif interruption == "zero_count":
+        minutes.loc[7, "fluid_temp_c__count"] = 0
+    elif interruption == "unsteady":
+        minutes.loc[7, "steady"] = False
+    else:
+        minutes.loc[7, ["operating_mode", "steady"]] = [interruption, False]
+    result = cavitation_detect(minutes, assets)
+    assert pd.to_datetime(result.alert_time_utc, utc=True).tolist() == [
+        START + pd.Timedelta(minutes=5),
+    ]
+
+
+@pytest.mark.parametrize("mode", ["STOPPED", "LOCKED_OUT"])
+def test_cavitation_future_stop_and_restart_cannot_change_prefix(mode):
+    minutes, assets = cavitation_fixture([-75] * 25)
+    minutes.loc[7:9, ["operating_mode", "steady"]] = [mode, False]
+    cut = START + pd.Timedelta(minutes=6)
+    complete = cavitation_detect(minutes, assets)
+    expected = complete.loc[pd.to_datetime(complete.alert_time_utc, utc=True) <= cut]
+    available = minutes.window_start_utc + AVAILABILITY["features_1min.parquet"].latency <= cut
+    assert_frame_equal(cavitation_detect(minutes.loc[available], assets), expected, check_exact=True)
+    assert_frame_equal(cavitation_detect(minutes, assets, until=cut), expected, check_exact=True)
+    changed = minutes.copy()
+    changed.loc[~available, ["operating_mode", "steady", "suction_pressure_kpa__mean", "quality_any"]] = [
+        "STARTING", False, 500, 1.0,
+    ]
+    changed_full = cavitation_detect(changed, assets)
+    assert_frame_equal(changed_full.loc[pd.to_datetime(changed_full.alert_time_utc, utc=True) <= cut],
+                       expected, check_exact=True)
+    assert_frame_equal(cavitation_detect(changed, assets, until=cut), expected, check_exact=True)
 
 
 def test_cavitation_speed_squared_scaling_uses_measured_speed():
