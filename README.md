@@ -137,7 +137,7 @@ python -m retrofit_assistant.pump_table --data $D --out build/scores/pump_table.
 # Dashboard in build/dashboard/: fleet overview (index.html) and one operator page per train or
 # validation pump; uses the predictions written by compare
 python -m retrofit_assistant.dashboard --table build/scores/pump_table.json --data $D --train-predictions build/predictions/full_train.csv --validation-predictions build/predictions/full_validation.csv --out build/dashboard
-# A snapshot generated at commit 6d551ee is published from docs/dashboard/.
+# A snapshot generated at commit d83f045 is published from docs/dashboard/.
 
 # Test-split submission and format check (the check prints only PASS or FAIL with the row count)
 python -m retrofit_assistant predict --data $D --split test --out build/submission/predictions_test_<UTC>_<commit>.csv
