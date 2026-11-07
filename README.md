@@ -1,10 +1,21 @@
+<p align="center">
+  <img src="docs/img/business_turku.png" alt="Business Turku" height="56">
+  &nbsp;&nbsp;&nbsp;
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/img/dodosolo_white.png">
+    <img src="docs/img/dodosolo.png" alt="DodoSolo" height="56">
+  </picture>
+  &nbsp;&nbsp;&nbsp;
+  <img src="docs/img/since_ai.png" alt="Since AI" height="56">
+</p>
+
 # Retrofit Assistant
 
 **Early, explainable warnings for existing pumps: what is going wrong, whether it is the machine or the instrument, and how sure we are.**
 
 Team DodoSolo · Since AI Hackathon 2026, challenge RETROFIT AI by Business Turku · MIT License · Python 3.14 · detector frozen at tag [`v1.0-freeze`](../../tree/v1.0-freeze) (commit `c355e31`)
 
-<!-- TODO: screenshot of the operator report (PUMP-08) or of the dashboard, if ready -->
+**[Open the live dashboard](https://edordopng.github.io/retrofit-assistant/dashboard/)**: fleet overview and operator view for every train and validation pump. Example: [PUMP-04, flow sensor noise](https://edordopng.github.io/retrofit-assistant/dashboard/PUMP-04_20250618T2210Z.html).
 
 ## Contents
 
@@ -113,6 +124,7 @@ python -m retrofit_assistant.pump_table --data $D --out build/scores/pump_table.
 # Dashboard in build/dashboard/: fleet overview (index.html) and one operator page per train or
 # validation pump; uses the predictions written by compare
 python -m retrofit_assistant.dashboard --table build/scores/pump_table.json --data $D --train-predictions build/predictions/full_train.csv --validation-predictions build/predictions/full_validation.csv --out build/dashboard
+# A snapshot generated at commit 6d551ee is published from docs/dashboard/.
 
 # Test-split submission and format check (the check prints only PASS or FAIL with the row count)
 python -m retrofit_assistant predict --data $D --split test --out build/submission/predictions_test_<UTC>_<commit>.csv
@@ -351,6 +363,8 @@ src/retrofit_assistant/   our package
 tests/                    suite, truncation test, boundaries and golden tests
 docs/decisions/           architecture decision records
 docs/specs/               specification with acceptance criteria and changes after approval
+docs/dashboard/           dashboard snapshot published on GitHub Pages
+docs/img/                 logos
 submission/               final test-split predictions
 challenge/RETROFIT_AI_PARTICIPANTS_2026/   official challenge package, unmodified (read-only)
 build/                    generated outputs (not tracked)
@@ -359,5 +373,7 @@ build/                    generated outputs (not tracked)
 ## License, attribution and team
 
 Our code is under the MIT License (`LICENSE`). `challenge/RETROFIT_AI_PARTICIPANTS_2026/` is the official challenge package, included unmodified, under its own licenses: MIT for code, CC BY 4.0 for data. See `ATTRIBUTION.md`.
+
+The Business Turku and Since AI logos are trademarks of their owners, shown only to identify the challenge and the event; no endorsement is implied.
 
 Team **DodoSolo**: Edoardo Diana. Built for the Since AI Hackathon 2026 (Turku, 6-8 November 2026), challenge RETROFIT AI by Business Turku.
