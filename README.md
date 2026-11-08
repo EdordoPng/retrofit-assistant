@@ -20,6 +20,8 @@ Team DodoSolo · Since AI Hackathon 2026, challenge RETROFIT AI by Business Turk
 
 **[Open the live dashboard](https://edordopng.github.io/retrofit-assistant/dashboard/)**: fleet overview and operator view for every train and validation pump. Example: [PUMP-04, flow sensor noise](https://edordopng.github.io/retrofit-assistant/dashboard/PUMP-04_20250618T2210Z.html).
 
+**[Watch the 2-minute demo video](https://youtu.be/XOrq6FwTxwc)**
+
 ## Contents
 
 1. [Overview](#overview)
