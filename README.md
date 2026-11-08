@@ -149,6 +149,9 @@ python -m retrofit_assistant check-submission --predictions build/submission/pre
 python -m pytest -q tests
 python -m pytest -q -m slow tests/test_causality.py
 python -m pytest -q challenge/RETROFIT_AI_PARTICIPANTS_2026/tests
+
+# Causality check on the test pumps (prints pass/fail only, never alert content)
+RETROFIT_CAUSALITY_ASSETS=PUMP-10,PUMP-11,PUMP-12 python -m pytest -q --tb=line --show-capture=no -p no:warnings tests/test_causality.py
 ```
 
 `report` and `predict --mask-tier` refuse the test split, and `ablate` runs only on train and validation pumps. `pump_table` and `dashboard` score and show only train and validation pumps; the test pumps appear with their tier only.
@@ -328,6 +331,7 @@ Example: a motor-driven fan on the same site.
 - **Warm-up.** No z-scores in the first hour of each pump's window.
 - **Confidence.** The low level has n = 3 on train; the report infers the level from the confidence value, because the CSV does not carry the rule.
 - **Scorer matching.** A change of fault type can move an alert onto another event, so part of the validation gains of the re-diagnosis and of the spectra comes from matching, not from a better diagnosis. On validation, single events drive the differences.
+- **Generalisation.** The package's stress tier (new random pumps) was not used; transfer to unseen pumps is measured only by the organizers' test split.
 
 ## How we built it
 
@@ -367,6 +371,7 @@ Four rules held throughout:
 - Write the evidence level to an output column instead of inferring it from the confidence value.
 - A read-only OPC UA or MQTT adapter, and a natural-language explanation of the report.
 - A pilot on a real pump: read-only data first, then shadow mode, comparing alerts with operator logs, alarms and work orders.
+- A what-if check of the recommended action in the challenge sandbox (`python -m retrofit_sim what_if`), in simulation only.
 
 ## Repository layout
 
