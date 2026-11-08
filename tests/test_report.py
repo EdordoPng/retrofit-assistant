@@ -811,7 +811,7 @@ def test_mean_sentence_uses_latest_real_observation(pattern_sample, monkeypatch)
     scored.loc[119, 'z_pd'] = 20.
     scored.loc[119, 'discharge_pressure_kpa__count'] = 0.
     html = report.pattern_panel(alert, frame, metadata)
-    assert 'Discharge pressure (kPa(g)) z=+0.0' in html
+    assert 'Discharge pressure (kPa(g)) z=0.0' in html
     assert 'the instrument is the likely cause' in html
 
 
@@ -905,3 +905,31 @@ def test_logo_asset_is_package_data():
     assert report.LOGO_PNG.parent.name == 'assets'
     config = tomllib.loads((Path(__file__).parents[1] / 'pyproject.toml').read_text())
     assert 'assets/*.png' in config['tool']['setuptools']['package-data']['retrofit_assistant']
+
+
+@pytest.mark.parametrize('noted', [True, False])
+def test_machine_following_sentence_respects_unverified_class_note(pattern_sample, monkeypatch, noted):
+    from retrofit_assistant.recommendations import _NOTES
+    frame, metadata, alert, _ = synthetic_pattern(pattern_sample, monkeypatch,
+        dict(q=8., pd=3., i=1.), event_class='MACHINE')
+    alert['recommended_action'] = ('Inspect: flow (flow_m3_h); x. Do: y. Rule out first: z.'
+                                   + (f' Note: {_NOTES["official"]}.' if noted else ''))
+    html = report.pattern_panel(alert, frame, metadata)
+    unverified = ('Flow moves and discharge pressure moves with it. This is consistent with the machine '
+                  'label, which the detector set from its baseline rules, not from the witnesses.')
+    assert (unverified in html) == noted
+    assert ('moves with it: the change is real, in the machine.' in html) != noted
+
+
+def test_unverified_note_never_follows_a_refuted_sensor():
+    from retrofit_assistant.recommendations import _NOTES, _action
+    row = dict(fault_type='UNKNOWN', event_class='MACHINE', evidence='flow_m3_h z=8',
+               decided_by='rediagnose_refuted')
+    assert _NOTES['official'] not in _action(row)
+    assert _NOTES['official'] in _action({**row, 'decided_by': 'official'})
+
+
+@pytest.mark.parametrize('value,limit,shown', [(-0.04, 2., '0.0'), (0.04, 6., '0.0'), (-0.0, 2., '0.0'),
+                                               (-0.06, 2., '-0.1'), (0.4, 2., '+0.4')])
+def test_value_rounding_to_zero_has_no_sign(value, limit, shown):
+    assert report.shown_value(value, limit) == shown

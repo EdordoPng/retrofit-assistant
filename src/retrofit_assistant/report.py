@@ -22,6 +22,7 @@ from .consistency import coupled_channels, observations
 from .detectors import score_features
 from .output import COLUMNS
 from .params import B1_K, COUPLED_STILL_FRACTION, NOISE_RECENT_MIN, STOP_MODES
+from .recommendations import _NOTES
 
 TIERS = {'T0_LEGACY': 'Legacy (T0)', 'T1_RETROFIT': 'Retrofit (T1)', 'T2_FULL': 'Full (T2)'}
 SIGNALS = ("vibration_rms_mm_s", "bearing_temp_c", "suction_pressure_kpa",
@@ -246,6 +247,8 @@ def shown_value(value, limit):
         shown = round(abs(value), digits)
         if shown != limit and (shown > limit) == (abs(value) > limit):
             break
+    if round(value, digits) == 0:
+        return f"{0:.{digits}f}"  # no sign on a value that rounds to zero
     return f"{value:+.{digits}f}"
 
 
@@ -384,6 +387,11 @@ def pattern_panel(alert, features, metadata):
         available_text = "Only one independent witness is" if still_count == 1 else "No independent witness is"
         sentence = (f"{available_text} available, so the instrument fault cannot be confirmed; "
                     "the official diagnosis stands.")
+    elif alert.event_class == "MACHINE" and following and _NOTES["official"] in str(alert.recommended_action):
+        # The class came from the official rules, so the witnesses agree with it but did not set it.
+        sentence = (f"{deviating_name} moves and {names(following)} "
+                    f"{'move' if len(following) > 1 else 'moves'} with it. This is consistent with the machine "
+                    "label, which the detector set from its baseline rules, not from the witnesses.")
     elif alert.event_class == "MACHINE" and following:
         sentence = (f"{deviating_name} moves and {names(following)} "
                     f"{'move' if len(following) > 1 else 'moves'} with it: the change is real, in the machine.")
