@@ -104,7 +104,7 @@ python -m retrofit_sim score --predictions build/predictions/full_validation.csv
 python -m retrofit_assistant report --asset PUMP-08 --data $D --predictions build/predictions/full_validation.csv --out build/report/ --until 2025-09-11T02:00:00Z
 ```
 
-On a clean clone of the tag, installation took about 30 seconds after the download, the validation score was reproduced in about 40 seconds, and the 38 official package tests passed. The runtime code on main is identical to the tag.
+On a clean clone of main, installation took about 25 seconds after the download, the validation score (86.1) was reproduced, and the 38 official package tests passed.
 
 The detector is frozen at tag `v1.0-freeze`. `main` adds only evaluation and reporting code, documentation and `submission/`; to check it, run `git diff --stat v1.0-freeze -- src/`: only `pump_table.py`, `dashboard.py`, `report.py` and the logo `assets/dodosolo_80.png` change.
 
@@ -137,7 +137,7 @@ python -m retrofit_assistant.pump_table --data $D --out build/scores/pump_table.
 # Dashboard in build/dashboard/: fleet overview (index.html) and one operator page per train or
 # validation pump; uses the predictions written by compare
 python -m retrofit_assistant.dashboard --table build/scores/pump_table.json --data $D --train-predictions build/predictions/full_train.csv --validation-predictions build/predictions/full_validation.csv --out build/dashboard
-# A snapshot generated at commit d83f045 is published from docs/dashboard/.
+# A snapshot generated at commit 267a412 is published from docs/dashboard/.
 
 # Test-split submission and format check (the check prints only PASS or FAIL with the row count)
 python -m retrofit_assistant predict --data $D --split test --out build/submission/predictions_test_<UTC>_<commit>.csv
